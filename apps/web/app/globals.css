@@ -1,0 +1,207 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --color-primary: #4a7c59;
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-surface: #F8FAFC;
+  --color-surface-50: #FFFFFF;
+  --color-surface-100: #F1F5F9;
+  --color-surface-200: #E2E8F0;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: 'Nunito Sans', system-ui, sans-serif;
+  background-color: var(--color-surface);
+  color: #1e293b;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-200);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+/* Utility classes */
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Card styles */
+.card {
+  @apply bg-white rounded-xl border border-slate-200 shadow-sm;
+}
+
+.card-header {
+  @apply px-4 py-3 border-b border-slate-100;
+}
+
+.card-body {
+  @apply p-4;
+}
+
+/* Button styles */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors;
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+}
+
+.btn-primary {
+  @apply btn bg-primary text-white hover:bg-primary-600 focus:ring-primary;
+}
+
+.btn-secondary {
+  @apply btn bg-slate-100 text-slate-700 hover:bg-slate-200 focus:ring-slate-400;
+}
+
+.btn-danger {
+  @apply btn bg-danger text-white hover:bg-red-600 focus:ring-danger;
+}
+
+.btn-success {
+  @apply btn bg-success text-white hover:bg-green-600 focus:ring-success;
+}
+
+.btn-sm {
+  @apply px-3 py-1.5 text-sm;
+}
+
+.btn-md {
+  @apply px-4 py-2 text-sm;
+}
+
+.btn-lg {
+  @apply px-6 py-3 text-base;
+}
+
+/* Badge styles */
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-success {
+  @apply badge bg-green-100 text-green-800;
+}
+
+.badge-warning {
+  @apply badge bg-amber-100 text-amber-800;
+}
+
+.badge-danger {
+  @apply badge bg-red-100 text-red-800;
+}
+
+.badge-info {
+  @apply badge bg-blue-100 text-blue-800;
+}
+
+.badge-neutral {
+  @apply badge bg-slate-100 text-slate-600;
+}
+
+/* Input styles */
+.input {
+  @apply w-full px-3 py-2 border border-slate-300 rounded-lg text-sm;
+  @apply focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+  @apply placeholder:text-slate-400;
+}
+
+.input-error {
+  @apply border-danger focus:ring-danger;
+}
+
+/* Select styles */
+.select {
+  @apply input appearance-none bg-white cursor-pointer;
+}
+
+/* Progress bar */
+.progress-bar {
+  @apply h-2 bg-slate-200 rounded-full overflow-hidden;
+}
+
+.progress-bar-fill {
+  @apply h-full rounded-full transition-all duration-300;
+}
+
+/* Status colors */
+.status-done {
+  @apply bg-success;
+}
+
+.status-in-progress {
+  @apply bg-warning;
+}
+
+.status-not-done {
+  @apply bg-danger;
+}
+
+/* Category colors */
+.category-tai_chinh { @apply text-blue-600 bg-blue-50; }
+.category-san_pham { @apply text-purple-600 bg-purple-50; }
+.category-khach_hang { @apply text-cyan-600 bg-cyan-50; }
+.category-thuong_hieu { @apply text-pink-600 bg-pink-50; }
+.category-he_thong { @apply text-orange-600 bg-orange-50; }
+.category-doi_ngu { @apply text-green-600 bg-green-50; }
+
+/* Animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Modal overlay */
+.modal-overlay {
+  @apply fixed inset-0 bg-black/50 flex items-center justify-center z-50;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.modal-content {
+  @apply bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-auto;
+  animation: fadeIn 0.2s ease-out;
+}

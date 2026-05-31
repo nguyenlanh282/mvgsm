@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MV-GSM Executive Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#4a7c59",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#cce8d1",
+                        "on-primary-container": "#052110",
+                        "secondary": "#536356",
+                        "on-secondary": "#ffffff",
+                        "secondary-container": "#d6e8d8",
+                        "on-secondary-container": "#111f15",
+                        "tertiary": "#3c6472",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-container": "#c0e9fa",
+                        "on-tertiary-container": "#001f28",
+                        "error": "#ba1a1a",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#410002",
+                        "background": "#f8faf8",
+                        "on-background": "#191c1a",
+                        "surface": "#f8faf8",
+                        "on-surface": "#191c1a",
+                        "surface-variant": "#dee5dd",
+                        "on-surface-variant": "#424943",
+                        "outline": "#727972",
+                        "outline-variant": "#c2c9c1",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f2f5f1",
+                        "surface-container": "#ecefec",
+                        "surface-container-high": "#e7e9e6",
+                        "surface-container-highest": "#e1e4e0",
+                        "primary-fixed": "#cce8d1",
+                        "on-primary-fixed": "#052110",
+                        "primary-fixed-dim": "#b1ccb6",
+                        "on-primary-fixed-variant": "#324f3c",
+                        "secondary-fixed": "#d6e8d8",
+                        "on-secondary-fixed": "#111f15",
+                        "secondary-fixed-dim": "#baccbc",
+                        "on-secondary-fixed-variant": "#3c4b3f",
+                        "tertiary-fixed": "#c0e9fa",
+                        "on-tertiary-fixed": "#001f28",
+                        "tertiary-fixed-dim": "#a5ccdc",
+                        "on-tertiary-fixed-variant": "#224c5a",
+                        "surface-dim": "#d8dbd7",
+                        "surface-bright": "#f8faf8",
+                        "inverse-surface": "#2e312f",
+                        "inverse-on-surface": "#eff2ee",
+                        "inverse-primary": "#b1ccb6",
+                        "surface-tint": "#4a7c59",
+                        "border-subtle": "#c2c9c1",
+                        "surface-finance": "#f8faf8",
+                        "success": "#22c55e",
+                        "warning": "#f59e0b",
+                        "danger": "#ef4444"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.75rem",
+                        "lg": "0.75rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-lg": "32px",
+                        "stack-md": "16px",
+                        "container-margin": "24px",
+                        "cell-gap": "4px",
+                        "stack-sm": "8px",
+                        "grid-gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Nunito Sans"],
+                        "badge-cap": ["Nunito Sans"],
+                        "headline-md": ["Nunito Sans"],
+                        "body-md": ["Nunito Sans"],
+                        "label-mono": ["JetBrains Mono"],
+                        "body-lg": ["Nunito Sans"],
+                        "headline-sm": ["Nunito Sans"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "badge-cap": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-mono": ["13px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-sm": ["18px", { "lineHeight": "28px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Nunito Sans', sans-serif; background-color: #f8faf8; color: #191c1a; }
+    </style>
+</head>
+<body class="bg-surface-finance text-on-surface">
+<!-- SideNavBar -->
+<nav class="fixed top-0 left-0 h-full w-[240px] bg-primary-container flex flex-col py-stack-md z-20">
+<div class="px-container-margin mb-stack-lg">
+<h1 class="font-headline-sm text-headline-sm font-bold text-on-primary-container">MV-GSM</h1>
+<p class="font-body-md text-body-md text-on-primary-container/70">Goal Manager</p>
+</div>
+<ul class="flex-1 overflow-y-auto">
+<li>
+<a class="flex items-center gap-3 px-container-margin py-3 text-primary font-bold bg-primary/10 border-r-4 border-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-container-margin py-3 text-on-primary-container/70 hover:text-primary hover:bg-primary/5 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="flag">flag</span>
+<span class="font-body-md text-body-md">Goals</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-container-margin py-3 text-on-primary-container/70 hover:text-primary hover:bg-primary/5 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-body-md text-body-md">Finance</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-container-margin py-3 text-on-primary-container/70 hover:text-primary hover:bg-primary/5 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-body-md text-body-md">Product</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-container-margin py-3 text-on-primary-container/70 hover:text-primary hover:bg-primary/5 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="person_check">person_check</span>
+<span class="font-body-md text-body-md">Personal KPI</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-container-margin py-3 text-on-primary-container/70 hover:text-primary hover:bg-primary/5 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="bar_chart">bar_chart</span>
+<span class="font-body-md text-body-md">Reports</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-container-margin py-3 text-on-primary-container/70 hover:text-primary hover:bg-primary/5 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-240px)] h-16 bg-surface flex items-center justify-between px-container-margin border-b border-border-subtle z-10 ml-[240px]">
+<div class="flex items-center gap-4">
+<span class="font-headline-sm text-headline-sm font-bold text-primary">Control Center</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-low transition-colors rounded-full">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<div class="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full border border-surface"></div>
+</div>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-low transition-colors rounded-full">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden bg-primary flex items-center justify-center">
+<span class="font-body-md text-body-md text-on-primary">AD</span>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-[240px] pt-16 min-h-screen p-container-margin flex flex-col gap-grid-gutter">
+<!-- Welcome Section -->
+<section class="mb-stack-sm">
+<h2 class="font-headline-lg text-headline-lg text-primary">Chào mừng, Admin/Director</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Tổng quan hiệu suất tổ chức tuần này.</p>
+</section>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-12 gap-grid-gutter">
+<!-- Section 1: 6 Pillars Scorecard -->
+<section class="col-span-12 xl:col-span-8 flex flex-col gap-stack-sm">
+<h3 class="font-headline-md text-headline-md text-primary">6 Trụ cột Mục tiêu</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-grid-gutter">
+<!-- Card 1: Tài chính -->
+<div class="bg-surface-container-lowest rounded-xl border border-border-subtle p-stack-md flex flex-col gap-stack-sm">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-sm text-headline-sm text-primary">Tài chính</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">12 Mục tiêu</p>
+</div>
+<span class="px-2 py-1 bg-success/10 text-success font-badge-cap text-badge-cap rounded-xl">TỐT</span>
+</div>
+<div class="mt-auto pt-stack-sm border-t border-border-subtle">
+<div class="flex justify-between mb-1">
+<span class="font-label-mono text-label-mono text-on-surface-variant">Hoàn thành</span>
+<span class="font-label-mono text-label-mono text-primary">85%</span>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-success h-full rounded-full" style="width: 85%"></div>
+</div>
+</div>
+</div>
+<!-- Card 2: Sản phẩm -->
+<div class="bg-surface-container-lowest rounded-xl border border-border-subtle p-stack-md flex flex-col gap-stack-sm">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-sm text-headline-sm text-primary">Sản phẩm</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">8 Mục tiêu</p>
+</div>
+<span class="px-2 py-1 bg-warning/10 text-warning font-badge-cap text-badge-cap rounded-xl">CHÚ Ý</span>
+</div>
+<div class="mt-auto pt-stack-sm border-t border-border-subtle">
+<div class="flex justify-between mb-1">
+<span class="font-label-mono text-label-mono text-on-surface-variant">Hoàn thành</span>
+<span class="font-label-mono text-label-mono text-primary">60%</span>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-warning h-full rounded-full" style="width: 60%"></div>
+</div>
+</div>
+</div>
+<!-- Card 3: Khách hàng -->
+<div class="bg-surface-container-lowest rounded-xl border border-border-subtle p-stack-md flex flex-col gap-stack-sm">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-sm text-headline-sm text-primary">Khách hàng</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">15 Mục tiêu</p>
+</div>
+<span class="px-2 py-1 bg-success/10 text-success font-badge-cap text-badge-cap rounded-xl">TỐT</span>
+</div>
+<div class="mt-auto pt-stack-sm border-t border-border-subtle">
+<div class="flex justify-between mb-1">
+<span class="font-label-mono text-label-mono text-on-surface-variant">Hoàn thành</span>
+<span class="font-label-mono text-label-mono text-primary">92%</span>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-success h-full rounded-full" style="width: 92%"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 4: Urgent Alerts -->
+<section class="col-span-12 xl:col-span-4 flex flex-col gap-stack-sm">
+<h3 class="font-headline-md text-headline-md text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-danger">warning</span>
+                    Cảnh báo Khẩn
+                </h3>
+<div class="bg-error-container/20 rounded-xl border border-danger/30 p-stack-md flex flex-col gap-stack-sm flex-1">
+<ul class="flex flex-col gap-stack-sm">
+<li class="bg-surface-container-lowest p-3 rounded-xl border border-danger/20 flex gap-3 items-start">
+<span class="material-symbols-outlined text-danger mt-1 text-sm">error</span>
+<div>
+<p class="font-body-md text-body-md font-bold text-primary">Mục tiêu Doanh số Q3</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-xs">Chưa cập nhật 2 tuần liên tiếp</p>
+</div>
+</li>
+</ul>
+</div>
+</section>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>KPI Cá nhân - Công cụ Tính toán</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#4a7c59",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#cce8d1",
+                        "on-primary-container": "#062111",
+                        "secondary": "#526354",
+                        "on-secondary": "#ffffff",
+                        "secondary-container": "#d5e8d5",
+                        "on-secondary-container": "#101f13",
+                        "tertiary": "#3a656f",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-container": "#bdeaf5",
+                        "on-tertiary-container": "#001f25",
+                        "error": "#ba1a1a",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#410002",
+                        "background": "#fbfdf8",
+                        "on-background": "#191c19",
+                        "surface": "#fbfdf8",
+                        "on-surface": "#191c19",
+                        "surface-variant": "#dde5da",
+                        "on-surface-variant": "#414942",
+                        "outline": "#717971",
+                        "outline-variant": "#c1c9be",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f5f8f3",
+                        "surface-container": "#eff2ee",
+                        "surface-container-high": "#e9ece8",
+                        "surface-container-highest": "#e3e6e2",
+                        "success": "#22C55E",
+                        "danger": "#EF4444",
+                        "warning": "#F59E0B",
+                        "surface-finance": "#f5f8f3",
+                        "border-subtle": "#dde5da"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.75rem",
+                        "lg": "0.75rem",
+                        "xl": "1rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "grid-gutter": "16px",
+                        "container-margin": "24px",
+                        "stack-sm": "8px",
+                        "cell-gap": "4px",
+                        "stack-md": "16px",
+                        "stack-lg": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Nunito Sans", "sans-serif"],
+                        "body-md": ["Nunito Sans", "sans-serif"],
+                        "badge-cap": ["Nunito Sans", "sans-serif"],
+                        "headline-sm": ["Nunito Sans", "sans-serif"],
+                        "body-lg": ["Nunito Sans", "sans-serif"],
+                        "label-mono": ["JetBrains Mono", "monospace"],
+                        "headline-lg": ["Nunito Sans", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "badge-cap": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "headline-sm": ["18px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "label-mono": ["13px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .calculating-pulse {
+            animation: borderPulse 1.5s infinite;
+        }
+        @keyframes borderPulse {
+            0% { border-bottom-color: #dde5da; }
+            50% { border-bottom-color: #4a7c59; }
+            100% { border-bottom-color: #dde5da; }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md h-screen flex flex-col md:hidden">
+<!-- Header -->
+<header class="flex items-center justify-between px-container-margin h-16 bg-surface-container-lowest border-b border-border-subtle sticky top-0 z-10">
+<button class="text-on-surface-variant hover:text-on-surface p-2 -ml-2 transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">arrow_back</span>
+</button>
+<h1 class="font-headline-sm text-headline-sm text-primary">KPI Cá nhân</h1>
+<button class="text-on-surface-variant hover:text-on-surface p-2 -mr-2 transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">more_vert</span>
+</button>
+</header>
+<!-- Main Content -->
+<main class="flex-1 overflow-y-auto pb-24">
+<div class="px-container-margin py-stack-md flex flex-col gap-stack-lg">
+<!-- Section 1: Input Parameters -->
+<section class="bg-surface-container-lowest border border-border-subtle rounded-xl p-stack-md shadow-sm">
+<div class="flex items-center gap-2 mb-stack-md">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">tune</span>
+<h2 class="font-headline-sm text-headline-sm text-primary">Thông số Đầu vào</h2>
+</div>
+<div class="flex flex-col gap-stack-sm">
+<div class="flex flex-col gap-1">
+<label class="font-body-md text-body-md text-on-surface-variant" for="income-target">Mục tiêu thu nhập (VND)</label>
+<input class="w-full bg-surface-finance border-b-2 border-border-subtle border-t-0 border-l-0 border-r-0 focus:ring-0 focus:border-primary font-label-mono text-label-mono px-0 py-2 transition-colors calculating-pulse" id="income-target" type="number" value="50000000"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-body-md text-body-md text-on-surface-variant" for="commission-rate">Tỷ lệ hoa hồng (%)</label>
+<input class="w-full bg-surface-finance border-b-2 border-border-subtle border-t-0 border-l-0 border-r-0 focus:ring-0 focus:border-primary font-label-mono text-label-mono px-0 py-2 transition-colors" id="commission-rate" type="number" value="5"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-body-md text-body-md text-on-surface-variant" for="conversion-rate">Tỷ lệ chuyển đổi (%)</label>
+<input class="w-full bg-surface-finance border-b-2 border-border-subtle border-t-0 border-l-0 border-r-0 focus:ring-0 focus:border-primary font-label-mono text-label-mono px-0 py-2 transition-colors" id="conversion-rate" type="number" value="10"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-body-md text-body-md text-on-surface-variant" for="avg-order-value">Giá trị đơn hàng TB (VND)</label>
+<input class="w-full bg-surface-finance border-b-2 border-border-subtle border-t-0 border-l-0 border-r-0 focus:ring-0 focus:border-primary font-label-mono text-label-mono px-0 py-2 transition-colors" id="avg-order-value" type="number" value="10000000"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-body-md text-body-md text-on-surface-variant" for="work-days">Số ngày làm việc/tháng</label>
+<input class="w-full bg-surface-finance border-b-2 border-border-subtle border-t-0 border-l-0 border-r-0 focus:ring-0 focus:border-primary font-label-mono text-label-mono px-0 py-2 transition-colors" id="work-days" type="number" value="22"/>
+</div>
+</div>
+</section>
+<!-- Section 2: Expected Results -->
+<section class="flex flex-col gap-stack-md">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">insights</span>
+<h2 class="font-headline-sm text-headline-sm text-primary">Kết quả Dự kiến</h2>
+</div>
+<div class="grid grid-cols-2 gap-cell-gap">
+<!-- Result Card 1 -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-lg p-stack-sm flex flex-col justify-between">
+<div class="flex items-center gap-2 mb-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 0;">monetization_on</span>
+<span class="font-body-md text-body-md text-[12px]">Doanh số MT</span>
+</div>
+<div class="font-label-mono text-label-mono font-bold text-primary mb-2">1.0B VND</div>
+<div class="w-full bg-surface-container h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[100%]"></div>
+</div>
+</div>
+<!-- Result Card 2 -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-lg p-stack-sm flex flex-col justify-between">
+<div class="flex items-center gap-2 mb-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 0;">shopping_cart</span>
+<span class="font-body-md text-body-md text-[12px]">SL Đơn hàng</span>
+</div>
+<div class="font-label-mono text-label-mono font-bold text-primary mb-2">100</div>
+<div class="w-full bg-surface-container h-1 rounded-full overflow-hidden">
+<div class="bg-success h-full w-[100%]"></div>
+</div>
+</div>
+<!-- Result Card 3 -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-lg p-stack-sm flex flex-col justify-between">
+<div class="flex items-center gap-2 mb-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 0;">groups</span>
+<span class="font-body-md text-body-md text-[12px]">KH Tiềm năng/Tháng</span>
+</div>
+<div class="font-label-mono text-label-mono font-bold text-primary mb-2">1000</div>
+<div class="w-full bg-surface-container h-1 rounded-full overflow-hidden">
+<div class="bg-warning h-full w-[100%]"></div>
+</div>
+</div>
+<!-- Result Card 4 -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-lg p-stack-sm flex flex-col justify-between">
+<div class="flex items-center gap-2 mb-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 0;">today</span>
+<span class="font-body-md text-body-md text-[12px]">KH Tiềm năng/Ngày</span>
+</div>
+<div class="font-label-mono text-label-mono font-bold text-primary mb-2">45</div>
+<div class="w-full bg-surface-container h-1 rounded-full overflow-hidden">
+<div class="bg-danger h-full w-[100%]"></div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Action Card (Fixed Bottom) -->
+<div class="fixed bottom-0 left-0 w-full bg-surface-container-lowest border-t border-border-subtle p-container-margin shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
+<div class="flex items-center justify-between mb-stack-sm">
+<div class="flex flex-col">
+<span class="font-badge-cap text-badge-cap text-on-surface-variant uppercase tracking-wider">Hành động hôm nay</span>
+<span class="font-headline-sm text-headline-sm text-primary font-bold">45 KH cần tiếp cận</span>
+</div>
+<div class="bg-danger/15 text-danger font-badge-cap text-badge-cap px-2 py-1 rounded">⚠️ Quan trọng</div>
+</div>
+<button class="w-full bg-primary text-on-primary font-body-lg text-body-lg font-bold py-3 rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
+<span>Bắt đầu</span>
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 0;">arrow_forward</span>
+</button>
+</div>
+</body></html>

@@ -1,0 +1,26 @@
+name = "goal-manager-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "goal-manager-db"
+database_id = "20571e97-50ca-4b90-aa87-2d16b63c810e"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "f0c6b5465ded4ce8bca0492bf7113f06"
+
+[[kv_namespaces]]
+binding = "AUDIT_KV"
+id = "7a79e0ced88648ebaef7d4264f21701d"
+
+[[r2_buckets]]
+bucket_name = "goal-manager-files"
+binding = "STORAGE"
+
+[vars]
+JWT_SECRET = "mvgsm-secret-key-2026-change-in-production"
+APP_ENV = "production"
+JWT_EXPIRES_IN = "28800"
+REFRESH_EXPIRES_IN = "2592000"

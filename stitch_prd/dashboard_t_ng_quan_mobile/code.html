@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Dashboard Tổng Quan</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#4a7c59",
+                        "border-subtle": "#c5e1d4",
+                        "surface-container-low": "#f4f9f6",
+                        "surface-container": "#eef5f1",
+                        "tertiary-container": "#93e0b5",
+                        "on-secondary-fixed": "#0f2017",
+                        "primary-container": "#cce8d7",
+                        "surface-container-high": "#e4efe8",
+                        "surface-tint": "#4a7c59",
+                        "on-tertiary-fixed-variant": "#234c35",
+                        "secondary-container": "#cce8d7",
+                        "tertiary-fixed-dim": "#a8ecc7",
+                        "on-secondary-container": "#183626",
+                        "on-primary-container": "#142d1f",
+                        "surface-variant": "#e4efe8",
+                        "on-surface-variant": "#4a6355",
+                        "on-primary-fixed": "#142d1f",
+                        "on-surface": "#161d19",
+                        "secondary-fixed-dim": "#a8ecc7",
+                        "on-background": "#161d19",
+                        "inverse-primary": "#a8ecc7",
+                        "primary-fixed-dim": "#a8ecc7",
+                        "surface-finance": "#f8fcf9",
+                        "secondary-fixed": "#cce8d7",
+                        "on-secondary-fixed-variant": "#2a543f",
+                        "tertiary": "#366a4f",
+                        "on-primary-fixed-variant": "#2a543f",
+                        "on-primary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "error": "#ba1a1a",
+                        "success": "#22C55E",
+                        "outline": "#7a9385",
+                        "neutral-dim": "#94A3B8",
+                        "secondary": "#4a7c59",
+                        "on-tertiary-container": "#142d1f",
+                        "outline-variant": "#c5e1d4",
+                        "on-tertiary": "#ffffff",
+                        "inverse-on-surface": "#f4f9f6",
+                        "primary-fixed": "#cce8d7",
+                        "danger": "#EF4444",
+                        "on-tertiary-fixed": "#0f2017",
+                        "tertiary-fixed": "#cce8d7",
+                        "background": "#f8fcf9",
+                        "warning": "#F59E0B",
+                        "inverse-surface": "#29312d",
+                        "surface-dim": "#e4efe8",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "surface-container-highest": "#e4efe8",
+                        "on-secondary": "#ffffff",
+                        "surface-bright": "#f8fcf9",
+                        "surface": "#f8fcf9",
+                        "on-error": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.75rem",
+                        "md": "0.75rem",
+                        "lg": "0.75rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-lg": "32px",
+                        "grid-gutter": "16px",
+                        "container-margin": "24px",
+                        "stack-sm": "8px",
+                        "stack-md": "16px",
+                        "cell-gap": "4px"
+                    },
+                    "fontFamily": {
+                        "badge-cap": ["Nunito Sans", "sans-serif"],
+                        "body-md": ["Nunito Sans", "sans-serif"],
+                        "headline-sm": ["Nunito Sans", "sans-serif"],
+                        "headline-lg": ["Nunito Sans", "sans-serif"],
+                        "label-mono": ["Nunito Sans", "sans-serif"],
+                        "body-lg": ["Nunito Sans", "sans-serif"],
+                        "headline-md": ["Nunito Sans", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "badge-cap": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-sm": ["18px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-mono": ["13px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Hide scrollbar for clean mobile view */
+        ::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Pulse animation for active calculating state */
+        @keyframes pulse-bottom {
+            0% { box-shadow: inset 0 -2px 0 0 rgba(74, 124, 89, 0.2); }
+            50% { box-shadow: inset 0 -2px 0 0 rgba(74, 124, 89, 0.8); }
+            100% { box-shadow: inset 0 -2px 0 0 rgba(74, 124, 89, 0.2); }
+        }
+        .animate-pulse-bottom { animation: pulse-bottom 2s infinite; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface-finance text-on-surface font-body-md antialiased pb-[80px] pt-[64px]">
+<!-- TopAppBar (Mobile Render) -->
+<header class="fixed top-0 left-0 w-full h-16 bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.03)] z-40 flex flex-row items-center justify-between px-container-margin transition-transform duration-300" id="top-app-bar">
+<!-- Brand / Title -->
+<div class="font-headline-sm text-headline-sm font-bold text-primary truncate">
+            Control Center
+        </div>
+<!-- Trailing Actions -->
+<div class="flex items-center gap-stack-md">
+<button aria-label="notifications" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors relative">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full border border-surface"></span>
+</button>
+<button aria-label="help_outline" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">help_outline</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-border-subtle bg-surface-container ml-1">
+<img alt="User Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCN164hfOAFCpBH-4B_zoG-1osZMVH_XLFmrsFgpiQv8c9m-eMMiu-nu41VVaes8knWw_V502q5a3VnZl86QUPIqq-fi4Ct4s6ZrCpdFHJ1pj9u5yYs2gsZiECkDIJ35qfRUOB9vJ3kZFKhTMJ89dv8T3v0XVfsfO1VzWdLbMovDViH3K73bm1o3b5bhSzWaxOAh_E9OcMYUBLM6Nqx58-gWInxCJOHuVgaUwcXYsowqpZvsg-juRu9BDnlGrQbrNa0PvRmvEpDynhg"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="px-container-margin py-stack-md flex flex-col gap-stack-lg">
+<!-- Page Header Context -->
+<section class="flex flex-col gap-1">
+<h1 class="font-headline-md text-headline-md text-on-surface">Tổng Quan</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Trạng thái sức khỏe doanh nghiệp tuần 42</p>
+</section>
+<!-- Urgent Alerts Section -->
+<section class="flex flex-col gap-stack-sm" id="alerts-container">
+<!-- Alert Card -->
+<div class="bg-[#FEF2F2] border border-[#FECACA] rounded-xl p-3 flex flex-row gap-3 items-start relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-danger"></div>
+<div class="pt-0.5">
+<span class="material-symbols-outlined text-danger text-[20px]" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div class="flex flex-col gap-1 pr-6">
+<span class="font-body-md text-body-md font-bold text-[#991B1B]">Cảnh báo: Doanh thu Q4</span>
+<span class="font-body-md text-body-md text-[#B91C1C] text-[13px] leading-tight">Tỉ lệ hoàn thành mục tiêu đang ở mức 68%, dưới ngưỡng an toàn (75%). Yêu cầu rà soát dự án Alpha.</span>
+</div>
+<button class="absolute top-3 right-3 text-[#FCA5A5] hover:text-danger" onclick="this.closest('.bg-[#FEF2F2]').remove()">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+</section>
+<!-- 6 Pillars Grid -->
+<section class="grid grid-cols-2 gap-grid-gutter">
+<!-- Pillar 1: Finance (Warning) -->
+<div class="bg-surface rounded-xl border border-border-subtle p-3 flex flex-col gap-stack-md shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+<div class="flex flex-row justify-between items-start">
+<span class="font-body-md text-body-md font-bold text-on-surface">Tài chính</span>
+<span class="material-symbols-outlined text-warning text-[18px]">payments</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-mono text-label-mono text-warning text-[18px] leading-none">82.4%</span>
+<span class="font-badge-cap text-badge-cap text-on-surface-variant uppercase tracking-wider text-[10px]">Lệch nhịp độ</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container rounded-full overflow-hidden mt-auto">
+<div class="h-full bg-warning" style="width: 82.4%"></div>
+</div>
+</div>
+<!-- Pillar 2: Product (Success) -->
+<div class="bg-surface rounded-xl border border-border-subtle p-3 flex flex-col gap-stack-md shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+<div class="flex flex-row justify-between items-start">
+<span class="font-body-md text-body-md font-bold text-on-surface">Sản phẩm</span>
+<span class="material-symbols-outlined text-success text-[18px]">inventory_2</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-mono text-label-mono text-success text-[18px] leading-none">96.0%</span>
+<span class="font-badge-cap text-badge-cap text-on-surface-variant uppercase tracking-wider text-[10px]">Ổn định</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container rounded-full overflow-hidden mt-auto">
+<div class="h-full bg-success" style="width: 96%"></div>
+</div>
+</div>
+<!-- Pillar 3: Sales (Danger) -->
+<div class="bg-surface rounded-xl border border-border-subtle p-3 flex flex-col gap-stack-md shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+<div class="flex flex-row justify-between items-start">
+<span class="font-body-md text-body-md font-bold text-on-surface">Kinh doanh</span>
+<span class="material-symbols-outlined text-danger text-[18px]">trending_up</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-mono text-label-mono text-danger text-[18px] leading-none">68.5%</span>
+<span class="font-badge-cap text-badge-cap text-on-surface-variant uppercase tracking-wider text-[10px]">Rủi ro cao</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container rounded-full overflow-hidden mt-auto">
+<div class="h-full bg-danger" style="width: 68.5%"></div>
+</div>
+</div>
+<!-- Pillar 4: Operations (Success) -->
+<div class="bg-surface rounded-xl border border-border-subtle p-3 flex flex-col gap-stack-md shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+<div class="flex flex-row justify-between items-start">
+<span class="font-body-md text-body-md font-bold text-on-surface">Vận hành</span>
+<span class="material-symbols-outlined text-success text-[18px]">settings_applications</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-mono text-label-mono text-success text-[18px] leading-none">98.2%</span>
+<span class="font-badge-cap text-badge-cap text-on-surface-variant uppercase tracking-wider text-[10px]">Tối ưu</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container rounded-full overflow-hidden mt-auto">
+<div class="h-full bg-success" style="width: 98.2%"></div>
+</div>
+</div>
+<!-- Pillar 5: HR (Neutral/Dim) -->
+<div class="bg-surface rounded-xl border border-border-subtle p-3 flex flex-col gap-stack-md shadow-[0_1px_2px_rgba(0,0,0,0.02)] bg-[#F8FAFC]">
+<div class="flex flex-row justify-between items-start">
+<span class="font-body-md text-body-md font-bold text-on-surface">Nhân sự</span>
+<span class="material-symbols-outlined text-neutral-dim text-[18px]">person_check</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-mono text-label-mono text-on-surface-variant text-[18px] leading-none">--</span>
+<span class="font-badge-cap text-badge-cap text-neutral-dim uppercase tracking-wider text-[10px]">Chờ cập nhật</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container rounded-full overflow-hidden mt-auto">
+<div class="h-full bg-neutral-dim" style="width: 0%"></div>
+</div>
+</div>
+<!-- Pillar 6: Marketing (Warning) -->
+<div class="bg-surface rounded-xl border border-border-subtle p-3 flex flex-col gap-stack-md shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+<div class="flex flex-row justify-between items-start">
+<span class="font-body-md text-body-md font-bold text-on-surface">Marketing</span>
+<span class="material-symbols-outlined text-warning text-[18px]">campaign</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-mono text-label-mono text-warning text-[18px] leading-none">75.0%</span>
+<span class="font-badge-cap text-badge-cap text-on-surface-variant uppercase tracking-wider text-[10px]">Đang theo dõi</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container rounded-full overflow-hidden mt-auto">
+<div class="h-full bg-warning" style="width: 75%"></div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Mobile Layout mapped from SideNavBar JSON) -->
+<!-- Prohibiting top border per rules, using subtle drop shadow -->
+<nav class="fixed bottom-0 left-0 w-full bg-surface shadow-[0_-2px_10px_rgba(0,0,0,0.03)] z-50 pb-[env(safe-area-inset-bottom)]">
+<div class="flex flex-row justify-around items-center h-[68px] px-2">
+<!-- Dashboard (Active) -->
+<button class="flex flex-col items-center justify-center w-16 gap-1 group">
+<div class="flex items-center justify-center w-12 h-8 rounded-full bg-primary-container text-primary transition-colors">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+</div>
+<span class="font-badge-cap text-badge-cap text-[10px] text-primary">Dashboard</span>
+</button>
+<!-- Goals (Inactive) -->
+<button class="flex flex-col items-center justify-center w-16 gap-1 group">
+<div class="flex items-center justify-center w-12 h-8 rounded-full text-on-surface-variant group-hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[24px]">flag</span>
+</div>
+<span class="font-badge-cap text-badge-cap text-[10px] text-on-surface-variant">Goals</span>
+</button>
+<!-- Finance (Inactive) -->
+<button class="flex flex-col items-center justify-center w-16 gap-1 group">
+<div class="flex items-center justify-center w-12 h-8 rounded-full text-on-surface-variant group-hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[24px]">payments</span>
+</div>
+<span class="font-badge-cap text-badge-cap text-[10px] text-on-surface-variant">Finance</span>
+</button>
+<!-- Reports (Inactive) -->
+<button class="flex flex-col items-center justify-center w-16 gap-1 group">
+<div class="flex items-center justify-center w-12 h-8 rounded-full text-on-surface-variant group-hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[24px]">bar_chart</span>
+</div>
+<span class="font-badge-cap text-badge-cap text-[10px] text-on-surface-variant">Reports</span>
+</button>
+<!-- Settings (Inactive) -->
+<button class="flex flex-col items-center justify-center w-16 gap-1 group">
+<div class="flex items-center justify-center w-12 h-8 rounded-full text-on-surface-variant group-hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[24px]">settings</span>
+</div>
+<span class="font-badge-cap text-badge-cap text-[10px] text-on-surface-variant">Settings</span>
+</button>
+</div>
+</nav>
+<script>
+        // Simple scroll listener to apply a more distinct shadow to TopAppBar when scrolling down
+        const topAppBar = document.getElementById('top-app-bar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 10) {
+                topAppBar.classList.add('shadow-[0_2px_8px_rgba(0,0,0,0.08)]');
+                topAppBar.classList.remove('shadow-[0_1px_4px_rgba(0,0,0,0.03)]');
+            } else {
+                topAppBar.classList.remove('shadow-[0_2px_8px_rgba(0,0,0,0.08)]');
+                topAppBar.classList.add('shadow-[0_1px_4px_rgba(0,0,0,0.03)]');
+            }
+        });
+    </script>
+</body></html>

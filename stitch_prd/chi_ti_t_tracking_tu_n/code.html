@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MV-GSM Goal Manager - Chi tiết mục tiêu</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                "primary": "#4a7c59",
+                "secondary-fixed": "#d0ebd6",
+                "error": "#ba1a1a",
+                "inverse-primary": "#a6d3b4",
+                "tertiary-container": "#ffe089",
+                "surface-finance": "#F8FAFC",
+                "danger": "#EF4444",
+                "primary-container": "#1e3123",
+                "tertiary-fixed": "#ffe089",
+                "on-error": "#ffffff",
+                "border-subtle": "#e6e1df",
+                "surface-tint": "#4a7c59",
+                "secondary-container": "#cde9d2",
+                "on-error-container": "#93000a",
+                "surface-dim": "#dbd6d3",
+                "surface-bright": "#fbf9f6",
+                "secondary": "#516355",
+                "on-secondary-fixed-variant": "#3a4b3e",
+                "error-container": "#ffdad6",
+                "surface-container-high": "#ebe5e3",
+                "warning": "#F59E0B",
+                "primary-fixed-dim": "#a6d3b4",
+                "tertiary-fixed-dim": "#e4c46f",
+                "on-tertiary": "#ffffff",
+                "inverse-surface": "#31302f",
+                "on-secondary-fixed": "#0e1f13",
+                "surface-container-lowest": "#ffffff",
+                "on-secondary": "#ffffff",
+                "inverse-on-surface": "#f5f0ee",
+                "on-surface": "#1a1c1a",
+                "outline": "#727972",
+                "on-tertiary-fixed-variant": "#554500",
+                "secondary-fixed-dim": "#b1ccb7",
+                "on-secondary-container": "#344a39",
+                "on-background": "#1a1c1a",
+                "tertiary": "#705d00",
+                "surface-container-highest": "#e5e0dd",
+                "primary-fixed": "#c2efcf",
+                "surface-variant": "#dee5db",
+                "neutral-dim": "#94A3B8",
+                "on-primary-fixed": "#00210d",
+                "on-tertiary-container": "#554500",
+                "on-primary-fixed-variant": "#324f39",
+                "surface": "#fbf9f6",
+                "success": "#22C55E",
+                "on-surface-variant": "#424942",
+                "on-primary": "#ffffff",
+                "on-tertiary-fixed": "#221b00",
+                "outline-variant": "#c2c9c1",
+                "surface-container-low": "#f5f0ee",
+                "surface-container": "#efeaeb",
+                "on-primary-container": "#a6d3b4",
+                "background": "#fbf9f6"
+              },
+              "borderRadius": {
+                "DEFAULT": "0.75rem",
+                "lg": "1rem",
+                "xl": "1.5rem",
+                "full": "9999px"
+              },
+              "spacing": {
+                "stack-lg": "32px",
+                "stack-sm": "8px",
+                "grid-gutter": "16px",
+                "stack-md": "16px",
+                "container-margin": "24px",
+                "cell-gap": "4px"
+              },
+              "fontFamily": {
+                "label-mono": [
+                  "JetBrains Mono"
+                ],
+                "badge-cap": [
+                  "Nunito Sans"
+                ],
+                "body-md": [
+                  "Nunito Sans"
+                ],
+                "body-lg": [
+                  "Nunito Sans"
+                ],
+                "headline-sm": [
+                  "Nunito Sans"
+                ],
+                "headline-md": [
+                  "Nunito Sans"
+                ],
+                "headline-lg": [
+                  "Nunito Sans"
+                ]
+              },
+              "fontSize": {
+                "label-mono": [
+                  "13px",
+                  {
+                    "lineHeight": "16px",
+                    "fontWeight": "500"
+                  }
+                ],
+                "badge-cap": [
+                  "12px",
+                  {
+                    "lineHeight": "16px",
+                    "letterSpacing": "0.05em",
+                    "fontWeight": "700"
+                  }
+                ],
+                "body-md": [
+                  "14px",
+                  {
+                    "lineHeight": "20px",
+                    "fontWeight": "400"
+                  }
+                ],
+                "body-lg": [
+                  "16px",
+                  {
+                    "lineHeight": "24px",
+                    "fontWeight": "400"
+                  }
+                ],
+                "headline-sm": [
+                  "18px",
+                  {
+                    "lineHeight": "28px",
+                    "fontWeight": "600"
+                  }
+                ],
+                "headline-md": [
+                  "24px",
+                  {
+                    "lineHeight": "32px",
+                    "letterSpacing": "-0.01em",
+                    "fontWeight": "600"
+                  }
+                ],
+                "headline-lg": [
+                  "32px",
+                  {
+                    "lineHeight": "40px",
+                    "letterSpacing": "-0.02em",
+                    "fontWeight": "700"
+                  }
+                ]
+              }
+            }
+          }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-240px)] h-16 bg-surface border-b border-border-subtle flex items-center justify-between px-container-margin ml-[240px] z-50">
+<div class="flex items-center gap-4">
+<span class="font-headline-sm text-headline-sm font-bold text-primary">Control Center</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors p-2 rounded-DEFAULT active:scale-95 duration-150">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors p-2 rounded-DEFAULT active:scale-95 duration-150">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden">
+<img alt="User Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA8Hoo_zTvNlqB4A95hyFik_rnrOwRUCQsinJgeWgBbNbO2lImSIiAoxkXKY3caojeXFOphjfeD7A308Mzq-0l3Pw2mbboe6fMmTBOsm0FoQOA3p8e5xf4n6-ltl9rlpb6VcmVfVs7RNgc85fpvK2gE2b1QigmRcBmQsY-r7M3dl5MlUu36Lt6ZZImmLxVMVj01nE_iC6OdVW60HToXlxkYpxKy2y3wWTieigSWy9tu9o1H0XJ21jKGEDMDioebEW8fW6-BPeUvg1Qo"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<nav class="fixed top-0 left-0 h-full w-[240px] bg-primary-container flex flex-col py-stack-md z-50">
+<div class="px-container-margin mb-stack-lg">
+<h1 class="font-headline-sm text-headline-sm font-bold text-on-primary">MV-GSM</h1>
+<p class="text-on-primary-container text-body-md font-body-md mt-1">Goal Manager</p>
+</div>
+<ul class="flex-1 px-3 space-y-1">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-primary-container/70 hover:text-on-primary-fixed hover:bg-on-primary-fixed-variant/10 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-primary-fixed font-bold bg-on-primary-fixed-variant/30 border-r-4 border-primary-fixed opacity-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">flag</span>
+<span class="font-body-md text-body-md">Goals</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-primary-container/70 hover:text-on-primary-fixed hover:bg-on-primary-fixed-variant/10 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">payments</span>
+<span class="font-body-md text-body-md">Finance</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-primary-container/70 hover:text-on-primary-fixed hover:bg-on-primary-fixed-variant/10 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">inventory_2</span>
+<span class="font-body-md text-body-md">Product</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-primary-container/70 hover:text-on-primary-fixed hover:bg-on-primary-fixed-variant/10 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">person_check</span>
+<span class="font-body-md text-body-md">Personal KPI</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-primary-container/70 hover:text-on-primary-fixed hover:bg-on-primary-fixed-variant/10 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">bar_chart</span>
+<span class="font-body-md text-body-md">Reports</span>
+</a>
+</li>
+</ul>
+<div class="px-3 mt-auto">
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-primary-container/70 hover:text-on-primary-fixed hover:bg-on-primary-fixed-variant/10 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="ml-[240px] pt-16 min-h-screen p-container-margin @container">
+<!-- Header Section -->
+<div class="mb-stack-lg">
+<div class="flex items-start justify-between mb-stack-sm">
+<div>
+<div class="flex items-center gap-3 mb-2">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-high border border-border-subtle font-badge-cap text-badge-cap text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">inventory_2</span> Product Pillar
+                    </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-success/15 text-success font-badge-cap text-badge-cap">
+<span class="material-symbols-outlined text-[14px]">check_circle</span> On Track
+                    </span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-primary mb-2">Phát triển App Mobile version 2.0</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-3xl">Nâng cấp toàn diện giao diện và trải nghiệm người dùng cho ứng dụng di động, tích hợp thêm các tính năng thanh toán mới và tối ưu hóa hiệu suất.</p>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 bg-surface text-primary border border-border-subtle rounded-DEFAULT font-body-md text-body-md font-semibold hover:bg-surface-container-low transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">edit</span> Chỉnh sửa
+                </button>
+<button class="px-4 py-2 bg-primary text-on-primary rounded-DEFAULT font-body-md text-body-md font-semibold hover:bg-on-surface-variant transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span> Cập nhật tiến độ
+                </button>
+</div>
+</div>
+<!-- Key Metrics Bento -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-grid-gutter mt-stack-md">
+<div class="bg-surface p-4 rounded-DEFAULT border border-border-subtle">
+<p class="font-body-md text-body-md text-on-surface-variant mb-1">Mục tiêu (Expected)</p>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-md text-headline-md text-primary">100%</span>
+<span class="font-label-mono text-label-mono text-on-surface-variant">Hoàn thành</span>
+</div>
+</div>
+<div class="bg-surface p-4 rounded-DEFAULT border border-border-subtle relative overflow-hidden">
+<p class="font-body-md text-body-md text-on-surface-variant mb-1">Thực tế (Actual)</p>
+<div class="flex items-baseline gap-2 mb-3">
+<span class="font-headline-md text-headline-md text-primary">65%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full absolute bottom-0 left-0">
+<div class="h-full bg-primary rounded-full" style="width: 65%;"></div>
+</div>
+</div>
+<div class="bg-surface p-4 rounded-DEFAULT border border-border-subtle">
+<p class="font-body-md text-body-md text-on-surface-variant mb-1">Health Score</p>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-success"></div>
+<span class="font-headline-md text-headline-md text-primary">Tốt</span>
+</div>
+</div>
+<div class="bg-surface p-4 rounded-DEFAULT border border-border-subtle">
+<p class="font-body-md text-body-md text-on-surface-variant mb-1">Ngân sách</p>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-md text-headline-md text-primary">450M</span>
+<span class="font-label-mono text-label-mono text-on-surface-variant">/ 500M</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Layout Grid for Main Content -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-container-margin">
+<!-- Left Column: Weekly Grid & Audit Log -->
+<div class="xl:col-span-8 flex flex-col gap-container-margin">
+<!-- Weekly Tracking Grid -->
+<div class="bg-surface border border-border-subtle rounded-DEFAULT p-stack-md">
+<div class="flex items-center justify-between mb-stack-md">
+<h2 class="font-headline-sm text-headline-sm text-primary">Theo dõi theo tuần (53 Weeks)</h2>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1"><div class="w-3 h-3 rounded bg-success"></div><span class="font-badge-cap text-badge-cap text-on-surface-variant">Done</span></div>
+<div class="flex items-center gap-1"><div class="w-3 h-3 rounded bg-warning"></div><span class="font-badge-cap text-badge-cap text-on-surface-variant">In Progress</span></div>
+<div class="flex items-center gap-1"><div class="w-3 h-3 rounded bg-danger"></div><span class="font-badge-cap text-badge-cap text-on-surface-variant">Not Done</span></div>
+<div class="flex items-center gap-1"><div class="w-3 h-3 rounded bg-neutral-dim"></div><span class="font-badge-cap text-badge-cap text-on-surface-variant">N/A</span></div>
+</div>
+</div>
+<div class="flex flex-wrap gap-[4px]">
+<!-- Render 53 weeks. Week 26 is current. -->
+<script>
+                        for(let i=1; i<=53; i++) {
+                            let colorClass = "bg-neutral-dim";
+                            let title = `Week ${i} - Không áp dụng`;
+                            
+                            if(i >= 10 && i <= 40) {
+                                if(i < 20) { colorClass = "bg-success"; title = `Week ${i} - Đã hoàn thành`; }
+                                else if(i < 25) { colorClass = "bg-warning"; title = `Week ${i} - Đang thực hiện`; }
+                                else if(i === 25) { colorClass = "bg-danger"; title = `Week ${i} - Chậm tiến độ`; }
+                                else if(i === 26) { colorClass = "bg-warning ring-2 ring-primary ring-offset-2"; title = `Week ${i} - Tuần hiện tại (In Progress)`; }
+                                else { colorClass = "bg-surface-container-high border border-border-subtle"; title = `Week ${i} - Kế hoạch`; }
+                            }
+
+                            document.write(`
+                                <div class="w-6 h-6 rounded ${colorClass} cursor-pointer hover:opacity-80 transition-opacity" title="${title}"></div>
+                            `);
+                        }
+                    </script>
+</div>
+<div class="mt-4 pt-4 border-t border-border-subtle flex justify-between font-label-mono text-label-mono text-on-surface-variant">
+<span>W1</span>
+<span>W13</span>
+<span>W26 (Hiện tại)</span>
+<span>W39</span>
+<span>W53</span>
+</div>
+</div>
+<!-- Evidence & Audit Log -->
+<div class="bg-surface border border-border-subtle rounded-DEFAULT p-stack-md flex-1">
+<h2 class="font-headline-sm text-headline-sm text-primary mb-stack-md">Cập nhật gần đây &amp; Bằng chứng</h2>
+<div class="space-y-stack-md">
+<!-- Log Item 1 -->
+<div class="flex gap-4">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-bold text-sm shrink-0">
+                            TV
+                        </div>
+<div class="flex-1">
+<div class="bg-surface-container-low p-3 rounded-DEFAULT border border-border-subtle">
+<div class="flex justify-between items-start mb-1">
+<span class="font-body-md text-body-md font-semibold text-primary">Tran Van A</span>
+<span class="font-label-mono text-label-mono text-on-surface-variant text-xs">Hôm nay, 10:30</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-2">Đã hoàn thành thiết kế UI/UX cho module thanh toán. Chuyển sang giai đoạn cắt HTML.</p>
+<div class="flex gap-2">
+<a class="inline-flex items-center gap-1 px-2 py-1 bg-surface border border-border-subtle rounded text-xs font-label-mono hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[14px] text-danger">picture_as_pdf</span> design_specs_v2.pdf
+                                    </a>
+<a class="inline-flex items-center gap-1 px-2 py-1 bg-surface border border-border-subtle rounded text-xs font-label-mono hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined text-[14px] text-primary">image</span> mockups.jpg
+                                    </a>
+</div>
+</div>
+</div>
+</div>
+<!-- Log Item 2 -->
+<div class="flex gap-4">
+<div class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-sm shrink-0">
+                            NT
+                        </div>
+<div class="flex-1">
+<div class="bg-surface-container-low p-3 rounded-DEFAULT border border-border-subtle">
+<div class="flex justify-between items-start mb-1">
+<span class="font-body-md text-body-md font-semibold text-primary">Nguyen Thi B</span>
+<span class="font-label-mono text-label-mono text-on-surface-variant text-xs">Hôm qua, 15:45</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Cập nhật tiến độ tuần 25. Bị chậm do chờ API từ đối tác.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Context & Rewards -->
+<div class="xl:col-span-4 flex flex-col gap-container-margin">
+<!-- KPIs Context -->
+<div class="bg-surface border border-border-subtle rounded-DEFAULT p-stack-md">
+<h3 class="font-headline-sm text-headline-sm text-primary mb-stack-md">KPIs Liên kết</h3>
+<ul class="space-y-3">
+<li class="flex items-center justify-between border-b border-border-subtle pb-2">
+<span class="font-body-md text-body-md text-on-surface-variant">Tỷ lệ lỗi (Crash Rate)</span>
+<span class="font-label-mono text-label-mono text-primary font-bold">&lt; 1%</span>
+</li>
+<li class="flex items-center justify-between border-b border-border-subtle pb-2">
+<span class="font-body-md text-body-md text-on-surface-variant">Time to load</span>
+<span class="font-label-mono text-label-mono text-primary font-bold">&lt; 2s</span>
+</li>
+<li class="flex items-center justify-between">
+<span class="font-body-md text-body-md text-on-surface-variant">DAU Tăng trưởng</span>
+<span class="font-label-mono text-label-mono text-primary font-bold">+15%</span>
+</li>
+</ul>
+</div>
+<!-- Reward Section -->
+<div class="bg-tertiary-fixed/30 border border-tertiary-fixed-dim rounded-DEFAULT p-stack-md relative overflow-hidden">
+<div class="absolute top-0 right-0 p-2 opacity-20">
+<span class="material-symbols-outlined text-[64px]" style="font-variation-settings: 'FILL' 1;">emoji_events</span>
+</div>
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-warning" style="font-variation-settings: 'FILL' 1;">stars</span>
+<h3 class="font-headline-sm text-headline-sm text-on-tertiary-fixed">Phần thưởng (Reward)</h3>
+</div>
+<p class="font-body-md text-body-md text-on-tertiary-fixed-variant mb-4">Thưởng nóng 50,000,000 VND cho team dự án nếu hoàn thành đúng tiến độ và đạt các chỉ số KPI cam kết.</p>
+<div class="bg-surface-container-highest/50 rounded-DEFAULT p-3 mb-4">
+<div class="flex justify-between text-xs font-label-mono mb-1 text-on-tertiary-fixed-variant">
+<span>Tiến độ yêu cầu: 100%</span>
+<span>Hiện tại: 65%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full">
+<div class="h-full bg-warning rounded-full" style="width: 65%;"></div>
+</div>
+</div>
+<button class="w-full py-2 bg-on-tertiary-fixed-variant/20 text-on-tertiary-fixed-variant rounded-DEFAULT font-body-md text-body-md font-semibold cursor-not-allowed flex justify-center items-center gap-2" disabled="">
+<span class="material-symbols-outlined text-[18px]">lock</span> Yêu cầu nhận thưởng
+                    </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

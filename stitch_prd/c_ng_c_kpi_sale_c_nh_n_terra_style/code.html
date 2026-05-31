@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Personal KPI Calculation Tool</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#4a7c59",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#cce8d1",
+                        "on-primary-container": "#062110",
+                        "primary-fixed": "#cce8d1",
+                        "on-primary-fixed": "#062110",
+                        "on-primary-fixed-variant": "#324f3e",
+                        "primary-fixed-dim": "#b0ccb6",
+                        "inverse-primary": "#b0ccb6",
+                        "secondary": "#526354",
+                        "on-secondary": "#ffffff",
+                        "secondary-container": "#d5e8d5",
+                        "on-secondary-container": "#101f13",
+                        "secondary-fixed": "#d5e8d5",
+                        "on-secondary-fixed": "#101f13",
+                        "on-secondary-fixed-variant": "#3a4b3d",
+                        "secondary-fixed-dim": "#b9ccb9",
+                        "tertiary": "#39656b",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-container": "#bcebf2",
+                        "on-tertiary-container": "#001f23",
+                        "tertiary-fixed": "#bcebf2",
+                        "on-tertiary-fixed": "#001f23",
+                        "on-tertiary-fixed-variant": "#1f4d53",
+                        "tertiary-fixed-dim": "#a0cfd5",
+                        "error": "#ba1a1a",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#410002",
+                        "background": "#fdfdf9",
+                        "on-background": "#1a1c1a",
+                        "surface": "#fdfdf9",
+                        "on-surface": "#1a1c1a",
+                        "surface-variant": "#dde5da",
+                        "on-surface-variant": "#414942",
+                        "outline": "#717971",
+                        "outline-variant": "#c1c9be",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f7f8f3",
+                        "surface-container": "#f1f3ed",
+                        "surface-container-high": "#ebede8",
+                        "surface-container-highest": "#e6e8e2",
+                        "surface-bright": "#fdfdf9",
+                        "surface-dim": "#dddcd8",
+                        "surface-tint": "#4a7c59",
+                        "surface-finance": "#f6f9f6",
+                        "border-subtle": "#c1c9be",
+                        "danger": "#EF4444",
+                        "warning": "#F59E0B",
+                        "success": "#22C55E",
+                        "neutral-dim": "#94A3B8"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.75rem",
+                        "lg": "0.75rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-lg": "32px",
+                        "stack-md": "16px",
+                        "container-margin": "24px",
+                        "cell-gap": "4px",
+                        "stack-sm": "8px",
+                        "grid-gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Nunito Sans"],
+                        "badge-cap": ["Nunito Sans"],
+                        "headline-md": ["Nunito Sans"],
+                        "body-md": ["Nunito Sans"],
+                        "label-mono": ["JetBrains Mono"],
+                        "body-lg": ["Nunito Sans"],
+                        "headline-sm": ["Nunito Sans"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "badge-cap": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-mono": ["13px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-sm": ["18px", { "lineHeight": "28px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md min-h-screen flex">
+<!-- SideNavBar -->
+<nav class="fixed top-0 left-0 h-full w-[240px] bg-surface-container-low border-r border-border-subtle flex flex-col py-stack-md z-50">
+<div class="px-container-margin mb-stack-lg">
+<h1 class="font-headline-sm text-headline-sm font-bold text-primary">MV-GSM</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Goal Manager</p>
+</div>
+<ul class="flex flex-col flex-grow px-3">
+<!-- Dashboard -->
+<li>
+<a class="flex items-center px-4 py-3 rounded-xl text-on-surface-variant hover:text-primary hover:bg-primary-container/50 transition-colors mb-1" href="#">
+<span class="material-symbols-outlined mr-3">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+</li>
+<!-- Goals -->
+<li>
+<a class="flex items-center px-4 py-3 rounded-xl text-on-surface-variant hover:text-primary hover:bg-primary-container/50 transition-colors mb-1" href="#">
+<span class="material-symbols-outlined mr-3">flag</span>
+<span class="font-body-md text-body-md">Goals</span>
+</a>
+</li>
+<!-- Finance -->
+<li>
+<a class="flex items-center px-4 py-3 rounded-xl text-on-surface-variant hover:text-primary hover:bg-primary-container/50 transition-colors mb-1" href="#">
+<span class="material-symbols-outlined mr-3">payments</span>
+<span class="font-body-md text-body-md">Finance</span>
+</a>
+</li>
+<!-- Product -->
+<li>
+<a class="flex items-center px-4 py-3 rounded-xl text-on-surface-variant hover:text-primary hover:bg-primary-container/50 transition-colors mb-1" href="#">
+<span class="material-symbols-outlined mr-3">inventory_2</span>
+<span class="font-body-md text-body-md">Product</span>
+</a>
+</li>
+<!-- Personal KPI (Active) -->
+<li>
+<a class="flex items-center px-4 py-3 rounded-xl bg-primary-container text-on-primary-container font-bold transition-all duration-200 mb-1" href="#">
+<span class="material-symbols-outlined mr-3 text-primary">person_check</span>
+<span class="font-body-md text-body-md">Personal KPI</span>
+</a>
+</li>
+<!-- Reports -->
+<li>
+<a class="flex items-center px-4 py-3 rounded-xl text-on-surface-variant hover:text-primary hover:bg-primary-container/50 transition-colors mb-1" href="#">
+<span class="material-symbols-outlined mr-3">bar_chart</span>
+<span class="font-body-md text-body-md">Reports</span>
+</a>
+</li>
+<!-- Settings -->
+<li>
+<a class="flex items-center px-4 py-3 rounded-xl text-on-surface-variant hover:text-primary hover:bg-primary-container/50 transition-colors mb-1" href="#">
+<span class="material-symbols-outlined mr-3">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-240px)] h-16 bg-surface border-b border-border-subtle flex items-center justify-between px-container-margin z-40">
+<div class="flex items-center">
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">Control Center</span>
+</div>
+<div class="flex items-center space-x-4">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 transform -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="pl-10 pr-4 py-2 border border-border-subtle rounded-xl bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body-md text-body-md text-on-surface w-64 transition-shadow" placeholder="Tìm kiếm..." type="text"/>
+</div>
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors p-2 rounded-full">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors p-2 rounded-full">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-primary-container overflow-hidden border border-border-subtle">
+<img alt="User Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDNldCjcK6xEwE_QXL4HqvQR54jlYILNobG4sfOG1gddlXuPswwf8gzgYIvEcTDk-vp0WtpuFtF2iq8vgHj2IKeX72R5Dc1Dm3317ERiPZnHxc0EFxn08UqZQLatIUKd_ky6_gtkhlnx8cn1rd8ovp1n0gv0BalgiDEum3sgJ6X9wVPfsWRPGgIJELnl06D8mcqnNw2NAZNrzg4kwoHeZeIyMerTUXQ6oR4ief77FebGbfW5teyl10m8v2iudCeVR2rdC81CsjCTi78"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-[240px] mt-16 p-container-margin w-full max-w-[1440px] mx-auto min-h-[calc(100vh-64px)] flex flex-col">
+<div class="mb-stack-lg">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">Công cụ Tính toán KPI Cá nhân</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Nhập các thông số để xác định mục tiêu và hoạt động hàng ngày cần thiết.</p>
+</div>
+<div class="flex-grow flex flex-col lg:flex-row gap-grid-gutter">
+<!-- Left Panel: Input Form -->
+<div class="w-full lg:w-1/2 flex flex-col gap-stack-md">
+<div class="bg-surface-container-lowest border border-border-subtle rounded-xl p-container-margin shadow-sm h-full relative overflow-hidden">
+<div class="absolute bottom-0 left-0 w-full h-[2px] bg-primary hidden" id="calc-indicator"></div>
+<h3 class="font-headline-sm text-headline-sm font-semibold mb-stack-md border-b border-border-subtle pb-stack-sm flex items-center text-on-surface">
+<span class="material-symbols-outlined mr-2 text-primary">tune</span>
+                        Thông số Đầu vào
+                    </h3>
+<form class="space-y-stack-md flex-grow flex flex-col justify-center" id="kpi-form">
+<div>
+<label class="block font-label-mono text-label-mono text-on-surface-variant mb-1" for="targetIncome">Mục tiêu Thu nhập (VNĐ)</label>
+<input class="w-full border border-border-subtle rounded-xl bg-surface-container-lowest px-3 py-2 font-body-md text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-shadow" id="targetIncome" type="number" value="20000000"/>
+</div>
+<div class="grid grid-cols-2 gap-grid-gutter">
+<div>
+<label class="block font-label-mono text-label-mono text-on-surface-variant mb-1" for="commissionRate">Tỷ lệ Hoa hồng (%)</label>
+<input class="w-full border border-border-subtle rounded-xl bg-surface-container-lowest px-3 py-2 font-body-md text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-shadow" id="commissionRate" step="0.1" type="number" value="5"/>
+</div>
+<div>
+<label class="block font-label-mono text-label-mono text-on-surface-variant mb-1" for="conversionRate">Tỷ lệ Chuyển đổi (%)</label>
+<input class="w-full border border-border-subtle rounded-xl bg-surface-container-lowest px-3 py-2 font-body-md text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-shadow" id="conversionRate" step="0.1" type="number" value="2.5"/>
+</div>
+</div>
+<div>
+<label class="block font-label-mono text-label-mono text-on-surface-variant mb-1" for="avgOrderValue">Giá trị Đơn hàng TB (VNĐ)</label>
+<input class="w-full border border-border-subtle rounded-xl bg-surface-container-lowest px-3 py-2 font-body-md text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-shadow" id="avgOrderValue" type="number" value="5000000"/>
+</div>
+<div>
+<label class="block font-label-mono text-label-mono text-on-surface-variant mb-1" for="workingDays">Số ngày làm việc/tháng</label>
+<input class="w-full border border-border-subtle rounded-xl bg-surface-container-lowest px-3 py-2 font-body-md text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-shadow" id="workingDays" type="number" value="26"/>
+</div>
+</form>
+</div>
+</div>
+<!-- Right Panel: Real-time Results Card -->
+<div class="w-full lg:w-1/2 flex flex-col gap-stack-md">
+<div class="bg-surface-finance border border-border-subtle rounded-xl p-container-margin shadow-sm h-full flex flex-col relative overflow-hidden">
+<h3 class="font-headline-sm text-headline-sm font-semibold mb-stack-md border-b border-border-subtle pb-stack-sm flex items-center text-on-surface">
+<span class="material-symbols-outlined mr-2 text-primary">monitoring</span>
+                        Kết quả Dự kiến
+                    </h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-grid-gutter mb-stack-lg">
+<!-- Sales Target -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-xl p-stack-md flex flex-col justify-between">
+<span class="font-label-mono text-label-mono text-on-surface-variant mb-2">Doanh số Mục tiêu</span>
+<div class="flex items-end gap-2">
+<span class="font-headline-md text-headline-md text-on-surface" id="res-sales-target">400,000,000</span>
+<span class="font-body-md text-body-md text-on-surface-variant mb-1">VNĐ</span>
+</div>
+<div class="w-full h-1 bg-surface-variant rounded-full mt-3 overflow-hidden">
+<div class="h-full bg-primary w-full"></div>
+</div>
+</div>
+<!-- Quantity to Sell -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-xl p-stack-md flex flex-col justify-between">
+<span class="font-label-mono text-label-mono text-on-surface-variant mb-2">Số lượng Đơn hàng</span>
+<div class="flex items-end gap-2">
+<span class="font-headline-md text-headline-md text-on-surface" id="res-quantity">80</span>
+<span class="font-body-md text-body-md text-on-surface-variant mb-1">đơn</span>
+</div>
+<div class="w-full h-1 bg-surface-variant rounded-full mt-3 overflow-hidden">
+<div class="h-full bg-secondary w-full"></div>
+</div>
+</div>
+<!-- Monthly Prospects -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-xl p-stack-md flex flex-col justify-between">
+<span class="font-label-mono text-label-mono text-on-surface-variant mb-2">Khách hàng Tiềm năng/Tháng</span>
+<div class="flex items-end gap-2">
+<span class="font-headline-md text-headline-md text-on-surface" id="res-monthly-prospects">3,200</span>
+<span class="font-body-md text-body-md text-on-surface-variant mb-1">người</span>
+</div>
+<div class="w-full h-1 bg-surface-variant rounded-full mt-3 overflow-hidden">
+<div class="h-full bg-tertiary w-full"></div>
+</div>
+</div>
+<!-- Daily Prospects -->
+<div class="bg-primary-container border border-primary-fixed-dim rounded-xl p-stack-md flex flex-col justify-between">
+<span class="font-label-mono text-label-mono text-on-primary-container mb-2">Khách hàng Tiềm năng/Ngày</span>
+<div class="flex items-end gap-2">
+<span class="font-headline-lg text-headline-lg text-on-primary-container font-bold" id="res-daily-prospects">124</span>
+<span class="font-body-md text-body-md text-on-primary-container/80 mb-1">người</span>
+</div>
+<div class="w-full h-1 bg-primary-fixed-dim rounded-full mt-3 overflow-hidden">
+<div class="h-full bg-primary w-full"></div>
+</div>
+</div>
+</div>
+<!-- Bottom Action Summary -->
+<div class="mt-auto bg-primary text-on-primary rounded-xl p-stack-md flex items-center justify-between border border-primary shadow-sm relative overflow-hidden group">
+<div class="absolute inset-0 bg-gradient-to-r from-transparent via-on-primary/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+<div class="flex items-center gap-3 relative z-10">
+<div class="w-10 h-10 rounded-full bg-on-primary/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary">track_changes</span>
+</div>
+<div>
+<span class="block font-badge-cap text-badge-cap text-on-primary/80 uppercase tracking-widest">Mục tiêu Hành động Hôm nay</span>
+<span class="font-headline-sm text-headline-sm">Hôm nay bạn cần tiếp cận <strong class="text-tertiary-container font-bold" id="action-daily-target">124</strong> khách hàng tiềm năng.</span>
+</div>
+</div>
+<button class="bg-on-primary text-primary font-label-mono text-label-mono px-4 py-2 rounded-xl hover:bg-surface-container-low transition-colors z-10 font-bold">
+                            Bắt đầu
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputs = document.querySelectorAll('#kpi-form input');
+            const calcIndicator = document.getElementById('calc-indicator');
+            
+            const resSalesTarget = document.getElementById('res-sales-target');
+            const resQuantity = document.getElementById('res-quantity');
+            const resMonthlyProspects = document.getElementById('res-monthly-prospects');
+            const resDailyProspects = document.getElementById('res-daily-prospects');
+            const actionDailyTarget = document.getElementById('action-daily-target');
+
+            const formatCurrency = (num) => {
+                return new Intl.NumberFormat('vi-VN').format(Math.round(num));
+            };
+
+            const calculateKPI = () => {
+                // Show calculating pulse
+                calcIndicator.classList.remove('hidden');
+                calcIndicator.classList.add('animate-pulse');
+
+                setTimeout(() => {
+                    const targetIncome = parseFloat(document.getElementById('targetIncome').value) || 0;
+                    const commissionRate = parseFloat(document.getElementById('commissionRate').value) / 100 || 0;
+                    const conversionRate = parseFloat(document.getElementById('conversionRate').value) / 100 || 0;
+                    const avgOrderValue = parseFloat(document.getElementById('avgOrderValue').value) || 0;
+                    const workingDays = parseInt(document.getElementById('workingDays').value) || 1;
+
+                    if (commissionRate > 0 && avgOrderValue > 0 && conversionRate > 0) {
+                        // Sales Target = Income / Commission Rate
+                        const salesTarget = targetIncome / commissionRate;
+                        
+                        // Quantity = Sales Target / Avg Order Value
+                        const quantity = salesTarget / avgOrderValue;
+                        
+                        // Monthly Prospects = Quantity / Conversion Rate
+                        const monthlyProspects = quantity / conversionRate;
+                        
+                        // Daily Prospects = Monthly Prospects / Working Days (rounded up)
+                        const dailyProspects = Math.ceil(monthlyProspects / workingDays);
+
+                        resSalesTarget.textContent = formatCurrency(salesTarget);
+                        resQuantity.textContent = formatCurrency(quantity);
+                        resMonthlyProspects.textContent = formatCurrency(monthlyProspects);
+                        resDailyProspects.textContent = formatCurrency(dailyProspects);
+                        actionDailyTarget.textContent = formatCurrency(dailyProspects);
+                    }
+
+                    // Hide pulse
+                    calcIndicator.classList.add('hidden');
+                    calcIndicator.classList.remove('animate-pulse');
+                }, 300); // Fake small delay for "calculating" effect
+            };
+
+            inputs.forEach(input => {
+                input.addEventListener('input', calculateKPI);
+            });
+            
+            // Initial calculation
+            calculateKPI();
+        });
+    </script>
+</body></html>
