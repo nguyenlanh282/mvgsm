@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@mvgsm/shared'],
+  output: 'standalone',
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.optimization.splitChunks = {

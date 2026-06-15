@@ -212,7 +212,7 @@ export const goalsApi = {
     ),
 
   create: (data: Partial<Goal>) =>
-    api<{ success: boolean; data: Goal }>('/api/goals', { method: 'POST', body: data }),
+    api<{ success: boolean; data: Goal; weightWarning?: string; error?: string }>('/api/goals', { method: 'POST', body: data }),
 
   update: (id: string, data: Partial<Goal>) =>
     api<{ success: boolean; data: Goal }>(`/api/goals/${id}`, { method: 'PUT', body: data }),

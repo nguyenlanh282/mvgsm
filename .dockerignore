@@ -1,0 +1,41 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Next.js build outputs
+.apps/web/.next
+.apps/web/out
+
+# Git
+.git
+.gitignore
+
+# Development files
+*.md
+*.log
+.npm
+.env*.local
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Temp files
+tmp
+temp
+*.tmp
+
+# Wrangler (Cloudflare)
+apps/api/.wrangler
+apps/api/wrangler.toml
+
+# Misc
+.DS_Store
+Thumbs.db
