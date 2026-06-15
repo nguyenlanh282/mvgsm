@@ -147,6 +147,23 @@ goalRoutes.post('/', requireAdminOrManager(), requireNotFinance(), async (c) => 
       return c.json({ success: false, error: 'Tuần kết thúc phải lớn hơn hoặc bằng tuần bắt đầu' }, 400);
     }
 
+    // [C28] Weight validation warning
+    const weight = data.weight || 10;
+    const existingWeights = await c.env.DB.prepare(`
+      SELECT SUM(weight) as total FROM goals
+      WHERE company_id = ? AND category = ? AND year = ? AND status = 'active' AND deleted_at IS NULL
+    `).bind(companyId, data.category, data.year).first<{ total: number | null }>();
+
+    const currentTotal = existingWeights?.total || 0;
+    const newTotal = currentTotal + weight;
+    let weightWarning: string | null = null;
+
+    if (newTotal > 100) {
+      weightWarning = `⚠️ Trọng số trụ cột sẽ là ${newTotal}% (vượt quá 100%). Khuyến nghị điều chỉnh.`;
+    } else if (newTotal < 100) {
+      weightWarning = `⚠️ Trọng số trụ cột sẽ là ${newTotal}% (thiếu ${100 - newTotal}%).`;
+    }
+
     const goalId = crypto.randomUUID();
     const now = Date.now();
 
@@ -161,7 +178,7 @@ goalRoutes.post('/', requireAdminOrManager(), requireNotFinance(), async (c) => 
       goalId, companyId, data.category, data.year, data.quarter || null,
       startWeek, endWeek, data.title, data.description || null,
       data.measure || null, data.target_value || null, data.current_value || null,
-      data.unit || null, data.deadline || null, data.weight || 10,
+      data.unit || null, data.deadline || null, weight,
       data.owner_dept_id || null, JSON.stringify(data.collab_dept_ids || []),
       data.reward || null, data.reward_value || null,
       data.status || 'draft', userId, now, now
@@ -191,7 +208,7 @@ goalRoutes.post('/', requireAdminOrManager(), requireNotFinance(), async (c) => 
 
     const goal = await c.env.DB.prepare('SELECT * FROM goals WHERE id = ?').bind(goalId).first();
 
-    return c.json({ success: true, data: goal }, 201);
+    return c.json({ success: true, data: goal, weightWarning }, 201);
   } catch (err) {
     console.error('Create goal error:', err);
     return c.json({ success: false, error: 'Lỗi server' }, 500);
@@ -211,6 +228,25 @@ goalRoutes.put('/:id', requireAdminOrManager(), requireNotFinance(), async (c) =
 
     if (!existing) {
       return c.json({ success: false, error: 'Mục tiêu không tồn tại' }, 404);
+    }
+
+    // [C28] Weight validation warning
+    let weightWarning: string | null = null;
+    if (data.weight !== undefined) {
+      const category = data.category || existing.category;
+      const year = data.year || existing.year;
+      const existingWeights = await c.env.DB.prepare(`
+        SELECT SUM(weight) as total FROM goals
+        WHERE company_id = ? AND category = ? AND year = ? AND status = 'active' AND deleted_at IS NULL AND id != ?
+      `).bind(companyId, category, year, goalId).first<{ total: number | null }>();
+
+      const currentTotal = existingWeights?.total || 0;
+      const newTotal = currentTotal + data.weight;
+      if (newTotal > 100) {
+        weightWarning = `⚠️ Trọng số trụ cột sẽ là ${newTotal}% (vượt quá 100%). Khuyến nghị điều chỉnh.`;
+      } else if (newTotal < 100) {
+        weightWarning = `⚠️ Trọng số trụ cột sẽ là ${newTotal}% (thiếu ${100 - newTotal}%).`;
+      }
     }
 
     const fields: string[] = [];
@@ -271,7 +307,7 @@ goalRoutes.put('/:id', requireAdminOrManager(), requireNotFinance(), async (c) =
 
     const updated = await c.env.DB.prepare('SELECT * FROM goals WHERE id = ?').bind(goalId).first();
 
-    return c.json({ success: true, data: updated });
+    return c.json({ success: true, data: updated, weightWarning });
   } catch (err) {
     console.error('Update goal error:', err);
     return c.json({ success: false, error: 'Lỗi server' }, 500);

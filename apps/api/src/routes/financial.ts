@@ -160,6 +160,7 @@ financialRoutes.put('/actuals/:year/:month', requireAdminOrManager(), async (c) 
 });
 
 // Five-way analysis
+// Formula: Revenue = KHTN × Conversion Rate × Transactions per customer × AOV × Profit Margin
 financialRoutes.get('/fiveway/:year', async (c) => {
   try {
     const { companyId } = getUser(c);
@@ -177,16 +178,48 @@ financialRoutes.get('/fiveway/:year', async (c) => {
       SELECT * FROM financial_targets WHERE company_id = ? AND year = ?
     `).bind(companyId, year).first();
 
-    // Calculate five-way metrics
-    const monthlyData = actuals.results as any[];
+    // Get previous year data for comparison
+    const prevYear = year - 1;
+    const prevActuals = await c.env.DB.prepare(`
+      SELECT * FROM monthly_actuals WHERE company_id = ? AND year = ?
+      ORDER BY month
+    `).bind(companyId, prevYear).all();
 
-    // For now, return aggregated data
-    // In production, this would calculate:
-    // - KHTN (Leads)
-    // - Conversion Rate
-    // - Transactions per customer
-    // - AOV (Average Order Value)
-    // - Profit Margin
+    const monthlyData = actuals.results as any[];
+    const prevMonthlyData = prevActuals.results as any[];
+
+    // Calculate totals
+    const totalRevenue = monthlyData.reduce((sum: number, m: any) => sum + (m.revenue || 0), 0);
+    const totalCost = monthlyData.reduce((sum: number, m: any) => sum + (m.cost || 0), 0);
+    const totalProfit = monthlyData.reduce((sum: number, m: any) => sum + (m.profit || 0), 0);
+    const prevTotalRevenue = prevMonthlyData.reduce((sum: number, m: any) => sum + (m.revenue || 0), 0);
+
+    // Calculate five-way factors [S2.1]
+    // Using annual totals for calculation
+    const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
+    // For a complete five-way analysis, we need actual sales data
+    // These values would typically come from CRM or sales systems
+    // For now, we calculate based on available data and estimate the rest
+
+    // Get personal KPI data to estimate conversion rates
+    const kpiData = await c.env.DB.prepare(`
+      SELECT AVG(conversion_rate) as avg_conversion, AVG(avg_order_value) as avg_aov
+      FROM personal_kpi WHERE year = ?
+    `).bind(year).first();
+
+    const conversionRate = kpiData?.avg_conversion || 5; // Default 5% if no data
+    const avgOrderValue = kpiData?.avg_aov || 1000000; // Default 1M if no data
+
+    // Estimate KHTN and transactions from revenue
+    // Revenue = KHTN × Conversion × Transactions × AOV × Margin
+    // We can back-calculate KHTN × Transactions if we have revenue
+    const factorProduct = (conversionRate / 100) * (avgOrderValue) * (profitMargin / 100);
+    const khtnTransactions = factorProduct > 0 ? totalRevenue / factorProduct : 0;
+
+    // Assume average 3 transactions per customer
+    const transactionsPerCustomer = 3;
+    const estimatedKHTN = Math.sqrt(khtnTransactions / transactionsPerCustomer);
 
     return c.json({
       success: true,
@@ -196,10 +229,36 @@ financialRoutes.get('/fiveway/:year', async (c) => {
         actuals: monthlyData,
         target,
         summary: {
-          totalRevenue: monthlyData.reduce((sum: number, m: any) => sum + (m.revenue || 0), 0),
-          totalCost: monthlyData.reduce((sum: number, m: any) => sum + (m.cost || 0), 0),
-          totalProfit: monthlyData.reduce((sum: number, m: any) => sum + (m.profit || 0), 0),
+          totalRevenue,
+          totalCost,
+          totalProfit,
+          prevTotalRevenue,
+          revenueGrowth: prevTotalRevenue > 0 ? ((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100 : 0,
         },
+        fiveWay: {
+          // 5 factors [S2.1]
+          khtn: Math.round(estimatedKHTN), // Khách hàng tiềm năng
+          conversionRate: Math.round(conversionRate * 100) / 100,
+          transactionsPerCustomer,
+          avgOrderValue: Math.round(avgOrderValue),
+          profitMargin: Math.round(profitMargin * 100) / 100,
+          // Calculated revenue
+          calculatedRevenue: totalRevenue,
+          // Comparison vs previous year [S2.2]
+          prevYear: {
+            totalRevenue: prevTotalRevenue,
+          },
+        },
+        // Suggestions based on factors [S2.3]
+        suggestions: generateFiveWaySuggestions({
+          khtn: estimatedKHTN,
+          conversionRate,
+          transactionsPerCustomer,
+          avgOrderValue,
+          profitMargin,
+          totalRevenue,
+          targetRevenue: target?.revenue_target || 0,
+        }),
       },
     });
   } catch (err) {
@@ -207,3 +266,44 @@ financialRoutes.get('/fiveway/:year', async (c) => {
     return c.json({ success: false, error: 'Lỗi server' }, 500);
   }
 });
+
+// Helper function to generate suggestions for five-way analysis [S2.3]
+function generateFiveWaySuggestions(data: {
+  khtn: number
+  conversionRate: number
+  transactionsPerCustomer: number
+  avgOrderValue: number
+  profitMargin: number
+  totalRevenue: number
+  targetRevenue: number
+}): string[] {
+  const suggestions: string[] = []
+  const { totalRevenue, targetRevenue } = data
+
+  // Check if revenue meets target
+  if (targetRevenue > 0) {
+    const percentOfTarget = (totalRevenue / targetRevenue) * 100
+    if (percentOfTarget < 70) {
+      suggestions.push(`⚠️ Doanh thu mới đạt ${percentOfTarget.toFixed(1)}% kế hoạch. Cần tăng cường các biện pháp thúc đẩy.`)
+    }
+  }
+
+  // Check profit margin
+  if (data.profitMargin < 10) {
+    suggestions.push(`📉 Biên lợi nhuận thấp (${data.profitMargin.toFixed(1)}%). Cần xem xét cắt giảm chi phí hoặc tăng giá bán.`)
+  } else if (data.profitMargin > 30) {
+    suggestions.push(`✅ Biên lợi nhuận tốt (${data.profitMargin.toFixed(1)}%). Duy trì chiến lược hiện tại.`)
+  }
+
+  // Check conversion rate
+  if (data.conversionRate < 3) {
+    suggestions.push(`📊 Tỷ lệ chuyển đổi thấp (${data.conversionRate.toFixed(1)}%). Cần cải thiện chất lượng chăm sóc khách hàng.`)
+  }
+
+  // Check avg order value
+  if (data.avgOrderValue < 500000) {
+    suggestions.push(`💰 Giá trị đơn hàng trung bình thấp. Cân nhắc upsell/cross-sell để tăng AOV.`)
+  }
+
+  return suggestions
+}

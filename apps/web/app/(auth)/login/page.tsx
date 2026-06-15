@@ -5,6 +5,23 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { authApi } from '@/lib/api'
 
+// Password strength checker [C33]
+function getPasswordStrength(password: string): { level: number; label: string; color: string } {
+  if (!password) return { level: 0, label: '', color: '' }
+
+  let score = 0
+  if (password.length >= 8) score++
+  if (password.length >= 12) score++
+  if (/[A-Z]/.test(password)) score++
+  if (/[a-z]/.test(password)) score++
+  if (/[0-9]/.test(password)) score++
+  if (/[^A-Za-z0-9]/.test(password)) score++
+
+  if (score < 3) return { level: 1, label: 'Yếu', color: 'bg-red-500' }
+  if (score < 5) return { level: 2, label: 'Trung bình', color: 'bg-amber-500' }
+  return { level: 3, label: 'Mạnh', color: 'bg-green-500' }
+}
+
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
@@ -15,6 +32,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const { login } = useAuth()
   const router = useRouter()
+
+  const strength = getPasswordStrength(password)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -109,7 +128,33 @@ export default function LoginPage() {
                 required
                 minLength={8}
               />
-              {!isLogin && (
+              {!isLogin && password && (
+                <div className="mt-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex-1 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${strength.color}`}
+                        style={{ width: `${(strength.level / 3) * 100}%` }}
+                      />
+                    </div>
+                    <span className={`text-xs font-medium ${strength.color.replace('bg-', 'text-')}`}>
+                      {strength.label}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 text-xs text-slate-500">
+                    <span className={password.length >= 8 ? 'text-green-600' : ''}>
+                      ✓ ≥8 ký tự
+                    </span>
+                    <span className={/[A-Z]/.test(password) ? 'text-green-600' : ''}>
+                      ✓ 1 chữ hoa
+                    </span>
+                    <span className={/[0-9]/.test(password) ? 'text-green-600' : ''}>
+                      ✓ 1 số
+                    </span>
+                  </div>
+                </div>
+              )}
+              {!isLogin && !password && (
                 <p className="text-xs text-slate-500 mt-1">
                   Tối thiểu 8 ký tự, 1 chữ hoa, 1 số
                 </p>

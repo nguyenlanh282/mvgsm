@@ -89,7 +89,13 @@ export default function NewGoalPage() {
       })
 
       if (res.success) {
+        // Show weight warning if any
+        if (res.weightWarning) {
+          alert(res.weightWarning)
+        }
         router.push(`/goals/${res.data.id}`)
+      } else if (res.error) {
+        setError(res.error)
       }
     } catch (err: any) {
       setError(err.message || 'Đã xảy ra lỗi')

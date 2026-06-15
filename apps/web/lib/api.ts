@@ -300,6 +300,11 @@ export const financialApi = {
       method: 'PUT',
       body: data,
     }),
+
+  getFiveWay: (year: number, quarter?: number) => {
+    const qs = quarter ? `?quarter=${quarter}` : ''
+    return api<{ success: boolean; data: any }>(`/api/financial/fiveway/${year}${qs}`)
+  },
 }
 
 // Personal KPI API
@@ -406,6 +411,23 @@ export const activityApi = {
     api<{ success: boolean; data: { items: ActivityItem[]; total: number; page: number; pageSize: number } }>(
       `/api/activity-feed?limit=${limit}&page=${page}`
     ),
+}
+
+// Products API
+export const productsApi = {
+  list: (year?: number) => {
+    const qs = year ? `?year=${year}` : ''
+    return api<{ success: boolean; data: any[] }>(`/api/products${qs}`)
+  },
+
+  create: (data: any) =>
+    api<{ success: boolean; data: any }>('/api/products', { method: 'POST', body: data }),
+
+  update: (id: string, data: any) =>
+    api<{ success: boolean; data: any }>(`/api/products/${id}`, { method: 'PUT', body: data }),
+
+  delete: (id: string) =>
+    api<{ success: boolean }>(`/api/products/${id}`, { method: 'DELETE' }),
 }
 
 // Reports API

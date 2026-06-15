@@ -10,10 +10,12 @@ export default function FinancialPage() {
   const [year, setYear] = useState(getCurrentYear())
   const [target, setTarget] = useState<any>(null)
   const [actuals, setActuals] = useState<any[]>([])
+  const [fiveWay, setFiveWay] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [editingMonth, setEditingMonth] = useState<number | null>(null)
   const [editData, setEditData] = useState({ revenue: '' })
+  const [showFiveWay, setShowFiveWay] = useState(false)
   const canEdit = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'finance'
 
   useEffect(() => {
@@ -30,6 +32,19 @@ export default function FinancialPage() {
       if (targetRes.success) setTarget(targetRes.data)
       if (actualsRes.success) {
         setActuals(actualsRes.data.actuals || [])
+      }
+
+      // Load Five-Way data
+      const fiveWayRes = await fetch(
+        `https://goal-manager-api.admin-tripower-account.workers.dev/api/financial/fiveway/${year}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+          },
+        }
+      ).then(r => r.json())
+      if (fiveWayRes.success) {
+        setFiveWay(fiveWayRes.data)
       }
     } catch (err) {
       console.error('Failed to load financial data:', err)
@@ -94,15 +109,23 @@ export default function FinancialPage() {
           <h1 className="text-2xl font-bold text-slate-800">Tài Chính</h1>
           <p className="text-slate-500 mt-1">Năm {year}</p>
         </div>
-        <select
-          className="select w-32"
-          value={year}
-          onChange={(e) => setYear(parseInt(e.target.value))}
-        >
-          {[getCurrentYear() - 1, getCurrentYear(), getCurrentYear() + 1].map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowFiveWay(!showFiveWay)}
+            className="btn btn-sm btn-secondary"
+          >
+            {showFiveWay ? 'Ẩn Five-Way' : 'Five-Way Analysis'}
+          </button>
+          <select
+            className="select w-32"
+            value={year}
+            onChange={(e) => setYear(parseInt(e.target.value))}
+          >
+            {[getCurrentYear() - 1, getCurrentYear(), getCurrentYear() + 1].map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -134,6 +157,57 @@ export default function FinancialPage() {
           </div>
         </div>
       </div>
+
+      {/* Five-Way Analysis Section */}
+      {showFiveWay && fiveWay && (
+        <div className="card">
+          <div className="card-header">
+            <h2 className="font-semibold text-slate-800">Five-Way Analysis {year}</h2>
+            {fiveWay.summary?.revenueGrowth !== undefined && (
+              <span className={`text-sm font-medium ${fiveWay.summary.revenueGrowth >= 0 ? 'text-success' : 'text-danger'}`}>
+                {fiveWay.summary.revenueGrowth >= 0 ? '+' : ''}{fiveWay.summary.revenueGrowth.toFixed(1)}% so với {year - 1}
+              </span>
+            )}
+          </div>
+          <div className="card-body">
+            {/* 5 Factors Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+              <div className="p-4 bg-blue-50 rounded-lg text-center">
+                <p className="text-xs text-slate-500 mb-1">KHTN</p>
+                <p className="text-lg font-bold text-blue-700">{fiveWay.fiveWay?.khtn?.toLocaleString() || '-'}</p>
+              </div>
+              <div className="p-4 bg-green-50 rounded-lg text-center">
+                <p className="text-xs text-slate-500 mb-1">Tỷ lệ CĐ</p>
+                <p className="text-lg font-bold text-green-700">{fiveWay.fiveWay?.conversionRate?.toFixed(1) || '-'}%</p>
+              </div>
+              <div className="p-4 bg-purple-50 rounded-lg text-center">
+                <p className="text-xs text-slate-500 mb-1">Số lần GD/KH</p>
+                <p className="text-lg font-bold text-purple-700">{fiveWay.fiveWay?.transactionsPerCustomer || '-'}</p>
+              </div>
+              <div className="p-4 bg-amber-50 rounded-lg text-center">
+                <p className="text-xs text-slate-500 mb-1">DT TB đơn</p>
+                <p className="text-lg font-bold text-amber-700">{formatCurrency(fiveWay.fiveWay?.avgOrderValue || 0)}</p>
+              </div>
+              <div className="p-4 bg-rose-50 rounded-lg text-center">
+                <p className="text-xs text-slate-500 mb-1">Tỷ suất LN</p>
+                <p className="text-lg font-bold text-rose-700">{fiveWay.fiveWay?.profitMargin?.toFixed(1) || '-'}%</p>
+              </div>
+            </div>
+
+            {/* Suggestions */}
+            {fiveWay.suggestions && fiveWay.suggestions.length > 0 && (
+              <div className="mt-4 p-4 bg-amber-50 rounded-lg">
+                <h3 className="font-medium text-amber-800 mb-2">💡 Gợi ý chiến lược:</h3>
+                <ul className="space-y-1">
+                  {fiveWay.suggestions.map((s: string, i: number) => (
+                    <li key={i} className="text-sm text-amber-700">{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Target Setup */}
       <div className="card">
