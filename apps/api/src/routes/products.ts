@@ -1,9 +1,10 @@
+import type { AuthContext } from '../index';
 import { Hono } from 'hono';
 import { db, schema } from '../db';
 import { eq, and, desc } from 'drizzle-orm';
-import { requireAdminOrManager } from '../middleware/roles';
+import { requireAdminOrManager } from '../utils/roles';
 
-export const productRoutes = new Hono();
+export const productRoutes = new Hono<AuthContext>();
 
 // Get all products
 productRoutes.get('/', async (c) => {

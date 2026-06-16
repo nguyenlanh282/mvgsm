@@ -1,11 +1,12 @@
+import type { AuthContext } from '../index';
 import { Hono } from 'hono';
 import { db, schema } from '../db';
 import { eq, and, desc } from 'drizzle-orm';
-import { requireAdminOrManager } from '../middleware/roles';
+import { requireAdminOrManager } from '../utils/roles';
 import { writeAuditLog } from '../utils/audit';
 import { getCurrentYear } from '../utils/progress';
 
-export const financialRoutes = new Hono();
+export const financialRoutes = new Hono<AuthContext>();
 
 // Get financial targets for a year
 financialRoutes.get('/targets/:year', async (c) => {

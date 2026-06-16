@@ -1,12 +1,13 @@
+import type { AuthContext } from '../index';
 import { Hono } from 'hono';
-import { getUser } from '../middleware/auth';
-import { requireAdmin, requireAdminOrManager, requireNotFinance } from '../middleware/roles';
+import { getUser } from '../utils/roles';
+import { requireAdmin, requireAdminOrManager, requireNotFinance } from '../utils/roles';
 import { writeAuditLog } from '../utils/audit';
 import { getQuarterWeeks, has53Weeks } from '../utils/progress';
 import type { Env } from '../types';
 import type { Goal, GoalCategory } from '@mvgsm/shared';
 
-export const goalRoutes = new Hono<{ Bindings: Env }>();
+export const goalRoutes = new Hono<AuthContext>();
 
 // Get goals with filters
 goalRoutes.get('/', async (c) => {

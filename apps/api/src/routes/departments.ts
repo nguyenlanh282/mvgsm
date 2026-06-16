@@ -1,9 +1,10 @@
+import type { AuthContext } from '../index';
 import { Hono } from 'hono';
-import { requireAdminOrManager, requireAdmin } from '../middleware/roles';
+import { requireAdminOrManager, requireAdmin } from '../utils/roles';
 import { db, schema } from '../db';
 import { eq } from 'drizzle-orm';
 
-export const departmentRoutes = new Hono();
+export const departmentRoutes = new Hono<AuthContext>();
 
 // Get all departments
 departmentRoutes.get('/', async (c) => {

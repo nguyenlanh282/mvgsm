@@ -1,8 +1,9 @@
+import type { AuthContext } from '../index';
 import { Hono } from 'hono';
-import { getUser } from '../middleware/auth';
+import { getUser } from '../utils/roles';
 import type { Env } from '../types';
 
-export const personalKpiRoutes = new Hono<{ Bindings: Env }>();
+export const personalKpiRoutes = new Hono<AuthContext>();
 
 // Get personal KPI for current user
 personalKpiRoutes.get('/', async (c) => {

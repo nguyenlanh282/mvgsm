@@ -1,8 +1,9 @@
+import type { AuthContext } from '../index';
 import { Hono } from 'hono';
 import { db, schema } from '../db';
 import { eq } from 'drizzle-orm';
 
-export const companyRoutes = new Hono();
+export const companyRoutes = new Hono<AuthContext>();
 
 // Get company info
 companyRoutes.get('/', async (c) => {

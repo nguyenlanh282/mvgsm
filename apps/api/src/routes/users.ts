@@ -1,12 +1,13 @@
+import type { AuthContext } from '../index';
 import { Hono } from 'hono';
 import { hashPassword, validatePasswordPolicy } from '../utils/jwt';
-import { requireAdmin, requireAdminOrManager } from '../middleware/roles';
+import { requireAdmin, requireAdminOrManager } from '../utils/roles';
 import { writeAuditLog } from '../utils/audit';
 import { db, schema } from '../db';
 import { eq } from 'drizzle-orm';
 import type { User } from '@mvgsm/shared';
 
-export const userRoutes = new Hono();
+export const userRoutes = new Hono<AuthContext>();
 
 // Get all users in company
 userRoutes.get('/', requireAdminOrManager(), async (c) => {

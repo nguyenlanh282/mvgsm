@@ -1,11 +1,12 @@
+import type { AuthContext } from '../index';
 import { Hono } from 'hono';
-import { getUser } from '../middleware/auth';
-import { requireAdminOrManager, requireNotFinance } from '../middleware/roles';
+import { getUser } from '../utils/roles';
+import { requireAdminOrManager, requireNotFinance } from '../utils/roles';
 import { writeAuditLog } from '../utils/audit';
 import { calculateGoalProgress, getCurrentWeek, getCurrentYear } from '../utils/progress';
 import type { Env } from '../types';
 
-export const trackingRoutes = new Hono<{ Bindings: Env }>();
+export const trackingRoutes = new Hono<AuthContext>();
 
 // Get tracking data for a goal
 trackingRoutes.get('/goals/:id', async (c) => {
