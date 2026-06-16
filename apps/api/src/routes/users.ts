@@ -1,24 +1,24 @@
 import { Hono } from 'hono';
 import { hashPassword, validatePasswordPolicy } from '../utils/jwt';
-import { getUser } from '../middleware/auth';
 import { requireAdmin, requireAdminOrManager } from '../middleware/roles';
 import { writeAuditLog } from '../utils/audit';
-import type { Env } from '../types';
+import { db, schema } from '../db';
+import { eq } from 'drizzle-orm';
 import type { User } from '@mvgsm/shared';
 
-export const userRoutes = new Hono<{ Bindings: Env }>();
+export const userRoutes = new Hono();
 
 // Get all users in company
 userRoutes.get('/', requireAdminOrManager(), async (c) => {
   try {
-    const { companyId } = getUser(c);
+    const companyId = c.get('companyId');
 
-    const users = await c.env.DB.prepare(
-      `SELECT id, company_id, email, name, role, department_id, is_active, created_at
-       FROM users WHERE company_id = ? ORDER BY created_at DESC`
-    ).bind(companyId).all();
+    const users = await db.query.users.findMany({
+      where: eq(schema.users.companyId, companyId),
+      orderBy: (users, { desc }) => [desc(users.createdAt)],
+    });
 
-    return c.json({ success: true, data: users.results });
+    return c.json({ success: true, data: users });
   } catch (err) {
     console.error('Get users error:', err);
     return c.json({ success: false, error: 'Lỗi server' }, 500);
@@ -28,7 +28,8 @@ userRoutes.get('/', requireAdminOrManager(), async (c) => {
 // Create user (admin only)
 userRoutes.post('/', requireAdmin(), async (c) => {
   try {
-    const { companyId } = getUser(c);
+    const companyId = c.get('companyId');
+    const currentUserId = c.get('userId');
     const { email, password, name, role, department_id } = await c.req.json();
 
     if (!email || !password || !name || !role) {
@@ -42,9 +43,9 @@ userRoutes.post('/', requireAdmin(), async (c) => {
     }
 
     // Check if email already exists
-    const existing = await c.env.DB.prepare(
-      'SELECT id FROM users WHERE email = ?'
-    ).bind(email).first();
+    const existing = await db.query.users.findFirst({
+      where: eq(schema.users.email, email),
+    });
 
     if (existing) {
       return c.json({ success: false, error: 'Email đã được sử dụng' }, 409);
@@ -56,34 +57,38 @@ userRoutes.post('/', requireAdmin(), async (c) => {
     }
 
     const passwordHash = await hashPassword(password);
-    const userId = crypto.randomUUID();
-    const now = Date.now();
+    const now = new Date();
 
-    await c.env.DB.prepare(`
-      INSERT INTO users (id, company_id, email, password_hash, name, role, department_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(userId, companyId, email, passwordHash, name, role, department_id || null, now).run();
+    const [user] = await db.insert(schema.users).values({
+      companyId,
+      email,
+      passwordHash,
+      name,
+      role,
+      departmentId: department_id || null,
+      createdAt: now,
+    }).returning();
 
-    await writeAuditLog(c.env, {
+    await writeAuditLog({
       companyId,
       entityType: 'user',
-      entityId: userId,
+      entityId: user.id,
       action: 'user_created',
-      userId: getUser(c).userId,
-      userName: getUser(c).userId,
+      userId: currentUserId,
+      userName: currentUserId,
       newValue: { email, name, role },
     });
 
     return c.json({
       success: true,
       data: {
-        id: userId,
-        company_id: companyId,
-        email,
-        name,
-        role,
-        department_id,
-        created_at: now,
+        id: user.id,
+        company_id: user.companyId,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        department_id: user.departmentId,
+        created_at: user.createdAt,
       },
     }, 201);
   } catch (err) {
@@ -95,40 +100,42 @@ userRoutes.post('/', requireAdmin(), async (c) => {
 // Update user
 userRoutes.put('/:id', requireAdmin(), async (c) => {
   try {
-    const { companyId, userId: currentUserId } = getUser(c);
+    const companyId = c.get('companyId');
+    const currentUserId = c.get('userId');
     const targetUserId = c.req.param('id');
     const updates = await c.req.json();
 
     // Check if user exists and belongs to company
-    const existing = await c.env.DB.prepare(
-      'SELECT * FROM users WHERE id = ? AND company_id = ?'
-    ).bind(targetUserId, companyId).first<User>();
+    const existing = await db.query.users.findFirst({
+      where: eq(schema.users.id, targetUserId),
+    });
 
-    if (!existing) {
+    if (!existing || existing.companyId !== companyId) {
       return c.json({ success: false, error: 'Người dùng không tồn tại' }, 404);
     }
 
-    const fields: string[] = [];
-    const values: (string | number | null)[] = [];
+    const setData: Partial<{
+      name: string;
+      role: 'admin' | 'manager' | 'staff' | 'finance';
+      departmentId: string | null;
+      isActive: number;
+      passwordHash: string;
+    }> = {};
 
     if (updates.name !== undefined) {
-      fields.push('name = ?');
-      values.push(updates.name);
+      setData.name = updates.name;
     }
     if (updates.role !== undefined) {
       if (!['admin', 'manager', 'staff', 'finance'].includes(updates.role)) {
         return c.json({ success: false, error: 'Vai trò không hợp lệ' }, 400);
       }
-      fields.push('role = ?');
-      values.push(updates.role);
+      setData.role = updates.role;
     }
     if (updates.department_id !== undefined) {
-      fields.push('department_id = ?');
-      values.push(updates.department_id || null);
+      setData.departmentId = updates.department_id || null;
     }
     if (updates.is_active !== undefined) {
-      fields.push('is_active = ?');
-      values.push(updates.is_active ? 1 : 0);
+      setData.isActive = updates.is_active ? 1 : 0;
     }
     if (updates.password !== undefined) {
       // Validate password policy [C33]
@@ -136,22 +143,19 @@ userRoutes.put('/:id', requireAdmin(), async (c) => {
       if (!passwordCheck.valid) {
         return c.json({ success: false, error: passwordCheck.error }, 400);
       }
-      const passwordHash = await hashPassword(updates.password);
-      fields.push('password_hash = ?');
-      values.push(passwordHash);
+      setData.passwordHash = await hashPassword(updates.password);
     }
 
-    if (fields.length === 0) {
+    if (Object.keys(setData).length === 0) {
       return c.json({ success: false, error: 'Không có gì để cập nhật' }, 400);
     }
 
-    values.push(targetUserId);
+    const [updated] = await db.update(schema.users)
+      .set(setData)
+      .where(eq(schema.users.id, targetUserId))
+      .returning();
 
-    await c.env.DB.prepare(`
-      UPDATE users SET ${fields.join(', ')} WHERE id = ?
-    `).bind(...values).run();
-
-    await writeAuditLog(c.env, {
+    await writeAuditLog({
       companyId,
       entityType: 'user',
       entityId: targetUserId,
@@ -162,11 +166,6 @@ userRoutes.put('/:id', requireAdmin(), async (c) => {
       newValue: { role: updates.role },
       isCritical: updates.role !== existing.role,
     });
-
-    const updated = await c.env.DB.prepare(
-      `SELECT id, company_id, email, name, role, department_id, is_active, created_at
-       FROM users WHERE id = ?`
-    ).bind(targetUserId).first();
 
     return c.json({ success: true, data: updated });
   } catch (err) {

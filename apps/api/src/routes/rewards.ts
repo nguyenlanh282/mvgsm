@@ -1,36 +1,62 @@
 import { Hono } from 'hono';
-import { getUser } from '../middleware/auth';
-import { requireAdmin, requireAdminOrManager } from '../middleware/roles';
+import { db, schema } from '../db';
+import { eq, and, desc } from 'drizzle-orm';
 import { writeAuditLog } from '../utils/audit';
-import type { Env } from '../types';
+import type { AuthContext } from '../index';
 
-export const rewardRoutes = new Hono<{ Bindings: Env }>();
+const requireAdminOrManager = () => async (c: any, next: any) => {
+  const role = c.get('role');
+  if (role !== 'admin' && role !== 'manager') {
+    return c.json({ success: false, error: 'Không có quyền' }, 403);
+  }
+  await next();
+};
+
+const requireAdmin = () => async (c: any, next: any) => {
+  const role = c.get('role');
+  if (role !== 'admin') {
+    return c.json({ success: false, error: 'Không có quyền' }, 403);
+  }
+  await next();
+};
+
+export const rewardRoutes = new Hono<AuthContext>();
 
 // Get reward approvals
 rewardRoutes.get('/', requireAdminOrManager(), async (c) => {
   try {
-    const { companyId, role } = getUser(c);
+    const companyId = c.get('companyId') as string;
     const { status } = c.req.query();
 
-    let query = `
-      SELECT ra.*, g.title as goal_title, g.category, u.name as requester_name
-      FROM reward_approvals ra
-      JOIN goals g ON ra.goal_id = g.id
-      JOIN users u ON ra.requested_by = u.id
-      WHERE ra.company_id = ?
-    `;
-    const params: (string | number)[] = [companyId];
-
+    let conditions = [eq(schema.rewardApprovals.companyId, companyId)];
     if (status) {
-      query += ' AND ra.status = ?';
-      params.push(status);
+      conditions.push(eq(schema.rewardApprovals.status, status as 'pending' | 'approved' | 'rejected'));
     }
 
-    query += ' ORDER BY ra.requested_at DESC';
+    const approvals = await db
+      .select({
+        id: schema.rewardApprovals.id,
+        goalId: schema.rewardApprovals.goalId,
+        companyId: schema.rewardApprovals.companyId,
+        requestedBy: schema.rewardApprovals.requestedBy,
+        requestedAt: schema.rewardApprovals.requestedAt,
+        status: schema.rewardApprovals.status,
+        reviewedBy: schema.rewardApprovals.reviewedBy,
+        reviewedAt: schema.rewardApprovals.reviewedAt,
+        rejectReason: schema.rewardApprovals.rejectReason,
+        rewardDescription: schema.rewardApprovals.rewardDescription,
+        rewardValue: schema.rewardApprovals.rewardValue,
+        goalTitle: schema.goals.title,
+        category: schema.goals.category,
+        requesterName: schema.users.name,
+      })
+      .from(schema.rewardApprovals)
+      .leftJoin(schema.goals, eq(schema.rewardApprovals.goalId, schema.goals.id))
+      .leftJoin(schema.users, eq(schema.rewardApprovals.requestedBy, schema.users.id))
+      .where(and(...conditions))
+      .orderBy(desc(schema.rewardApprovals.requestedAt));
 
-    const approvals = await c.env.DB.prepare(query).bind(...params).all();
-
-    return c.json({ success: true, data: approvals.results });
+    return c.json({ success: true, data: approvals });
   } catch (err) {
     console.error('Get reward approvals error:', err);
     return c.json({ success: false, error: 'Lỗi server' }, 500);
@@ -40,14 +66,15 @@ rewardRoutes.get('/', requireAdminOrManager(), async (c) => {
 // Request reward - Trưởng BP đề nghị [C10]
 rewardRoutes.post('/goals/:id/request', requireAdminOrManager(), async (c) => {
   try {
-    const { companyId, userId } = getUser(c);
+    const companyId = c.get('companyId') as string;
+    const userId = c.get('userId') as string;
     const goalId = c.req.param('id');
     const { reward_description, reward_value } = await c.req.json();
 
     // Verify goal exists and belongs to company
-    const goal = await c.env.DB.prepare(
-      'SELECT * FROM goals WHERE id = ? AND company_id = ?'
-    ).bind(goalId, companyId).first();
+    const goal = await db.query.goals.findFirst({
+      where: and(eq(schema.goals.id, goalId), eq(schema.goals.companyId, companyId)),
+    });
 
     if (!goal) {
       return c.json({ success: false, error: 'Mục tiêu không tồn tại' }, 404);
@@ -59,51 +86,83 @@ rewardRoutes.post('/goals/:id/request', requireAdminOrManager(), async (c) => {
     }
 
     // Check if there's already a pending request [C13]
-    const pending = await c.env.DB.prepare(`
-      SELECT id FROM reward_approvals WHERE goal_id = ? AND status = 'pending'
-    `).bind(goalId).first();
+    const pending = await db.query.rewardApprovals.findFirst({
+      where: and(eq(schema.rewardApprovals.goalId, goalId), eq(schema.rewardApprovals.status, 'pending')),
+    });
 
     if (pending) {
       return c.json({ success: false, error: 'Đã có đề nghị đang chờ duyệt' }, 409);
     }
 
     const approvalId = crypto.randomUUID();
-    const now = Date.now();
+    const now = new Date();
 
-    await c.env.DB.prepare(`
-      INSERT INTO reward_approvals (
-        id, goal_id, company_id, requested_by, requested_at, status,
-        reward_description, reward_value
-      ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
-    `).bind(
-      approvalId, goalId, companyId, userId, now,
-      reward_description || goal.reward,
-      reward_value || goal.reward_value
-    ).run();
+    await db.insert(schema.rewardApprovals).values({
+      id: approvalId,
+      goalId: goalId,
+      companyId: companyId,
+      requestedBy: userId,
+      requestedAt: now,
+      status: 'pending',
+      rewardDescription: reward_description || goal.reward,
+      rewardValue: reward_value || goal.rewardValue,
+    });
 
     // Create notification for admin [C19]
-    await c.env.DB.prepare(`
-      INSERT INTO notifications (
-        id, company_id, user_id, type, title, content, entity_type, entity_id, is_read, created_at
-      ) SELECT
-        ?, ?, u.id, 'reward_request',
-        'Yêu cầu phê duyệt phần thưởng mới',
-        ?, 'reward_approval', ?, 0, ?
-      FROM users u WHERE u.role = 'admin' AND u.company_id = ?
-    `).bind(
-      crypto.randomUUID(), companyId,
-      `Yêu cầu phê duyệt phần thưởng cho mục tiêu: ${goal.title}`,
-      approvalId, now, companyId
-    ).run();
+    const admins = await db.query.users.findMany({
+      where: and(eq(schema.users.role, 'admin'), eq(schema.users.companyId, companyId)),
+    });
+
+    for (const admin of admins) {
+      await db.insert(schema.notifications).values({
+        id: crypto.randomUUID(),
+        companyId: companyId,
+        userId: admin.id,
+        type: 'reward_request',
+        title: 'Yêu cầu phê duyệt phần thưởng mới',
+        content: `Yêu cầu phê duyệt phần thưởng cho mục tiêu: ${goal.title}`,
+        entityType: 'reward_approval',
+        entityId: approvalId,
+        isRead: 0,
+        createdAt: now,
+      });
+    }
+
+    // Create notification for manager
+    const managers = await db.query.users.findMany({
+      where: and(eq(schema.users.role, 'manager'), eq(schema.users.companyId, companyId)),
+    });
+
+    for (const manager of managers) {
+      await db.insert(schema.notifications).values({
+        id: crypto.randomUUID(),
+        companyId: companyId,
+        userId: manager.id,
+        type: 'reward_request',
+        title: 'Yêu cầu phê duyệt phần thưởng mới',
+        content: `Yêu cầu phê duyệt phần thưởng cho mục tiêu: ${goal.title}`,
+        entityType: 'reward_approval',
+        entityId: approvalId,
+        isRead: 0,
+        createdAt: now,
+      });
+    }
 
     // Write to activity feed
-    await c.env.DB.prepare(`
-      INSERT INTO activity_feed (id, company_id, actor_id, actor_name, action, entity_type, entity_id, entity_title, created_at)
-      VALUES (?, ?, ?, ?, 'reward_requested', 'reward_approval', ?, ?, ?)
-    `).bind(crypto.randomUUID(), companyId, userId, userId, approvalId, goal.title, now).run();
+    await db.insert(schema.activityFeed).values({
+      id: crypto.randomUUID(),
+      companyId: companyId,
+      actorId: userId,
+      actorName: userId,
+      action: 'reward_requested',
+      entityType: 'reward_approval',
+      entityId: approvalId,
+      entityTitle: goal.title,
+      createdAt: now,
+    });
 
     // Audit log [C2]
-    await writeAuditLog(c.env, {
+    await writeAuditLog({
       companyId,
       entityType: 'financial',
       entityId: approvalId,
@@ -113,7 +172,9 @@ rewardRoutes.post('/goals/:id/request', requireAdminOrManager(), async (c) => {
       newValue: { goal_id: goalId, reward_description: reward_description || goal.reward },
     });
 
-    const approval = await c.env.DB.prepare('SELECT * FROM reward_approvals WHERE id = ?').bind(approvalId).first();
+    const approval = await db.query.rewardApprovals.findFirst({
+      where: eq(schema.rewardApprovals.id, approvalId),
+    });
 
     return c.json({ success: true, data: approval }, 201);
   } catch (err) {
@@ -125,12 +186,13 @@ rewardRoutes.post('/goals/:id/request', requireAdminOrManager(), async (c) => {
 // Approve reward [C10]
 rewardRoutes.put('/:id/approve', requireAdmin(), async (c) => {
   try {
-    const { companyId, userId } = getUser(c);
+    const companyId = c.get('companyId') as string;
+    const userId = c.get('userId') as string;
     const approvalId = c.req.param('id');
 
-    const approval = await c.env.DB.prepare(
-      'SELECT * FROM reward_approvals WHERE id = ? AND company_id = ?'
-    ).bind(approvalId, companyId).first();
+    const approval = await db.query.rewardApprovals.findFirst({
+      where: and(eq(schema.rewardApprovals.id, approvalId), eq(schema.rewardApprovals.companyId, companyId)),
+    });
 
     if (!approval) {
       return c.json({ success: false, error: 'Yêu cầu không tồn tại' }, 404);
@@ -140,36 +202,52 @@ rewardRoutes.put('/:id/approve', requireAdmin(), async (c) => {
       return c.json({ success: false, error: 'Yêu cầu này đã được xử lý' }, 400);
     }
 
-    const now = Date.now();
+    const now = new Date();
 
-    await c.env.DB.prepare(`
-      UPDATE reward_approvals SET status = 'approved', reviewed_by = ?, reviewed_at = ?
-      WHERE id = ?
-    `).bind(userId, now, approvalId).run();
+    await db
+      .update(schema.rewardApprovals)
+      .set({ status: 'approved', reviewedBy: userId, reviewedAt: now })
+      .where(eq(schema.rewardApprovals.id, approvalId));
 
     // Notify requester [C19]
-    await c.env.DB.prepare(`
-      INSERT INTO notifications (
-        id, company_id, user_id, type, title, content, entity_type, entity_id, is_read, created_at
-      ) VALUES (?, ?, ?, 'reward_approved', 'Phần thưởng đã được duyệt!', ?, 'reward_approval', ?, 0, ?)
-    `).bind(
-      crypto.randomUUID(), companyId, approval.requested_by,
-      `Phần thưởng cho mục tiêu đã được duyệt`, approvalId, now
-    ).run();
+    if (approval.requestedBy) {
+      await db.insert(schema.notifications).values({
+        id: crypto.randomUUID(),
+        companyId: companyId,
+        userId: approval.requestedBy,
+        type: 'reward_approved',
+        title: 'Phần thưởng đã được duyệt!',
+        content: 'Phần thưởng cho mục tiêu đã được duyệt',
+        entityType: 'reward_approval',
+        entityId: approvalId,
+        isRead: 0,
+        createdAt: now,
+      });
+    }
 
     // Update goal to show reward claimed [C10]
-    await c.env.DB.prepare(`
-      UPDATE goals SET updated_at = ? WHERE id = ?
-    `).bind(now, approval.goal_id).run();
+    if (approval.goalId) {
+      await db
+        .update(schema.goals)
+        .set({ updatedAt: now })
+        .where(eq(schema.goals.id, approval.goalId));
+    }
 
     // Write to activity feed
-    await c.env.DB.prepare(`
-      INSERT INTO activity_feed (id, company_id, actor_id, actor_name, action, entity_type, entity_id, entity_title, created_at)
-      VALUES (?, ?, ?, ?, 'reward_approved', 'reward_approval', ?, ?, ?)
-    `).bind(crypto.randomUUID(), companyId, userId, userId, approvalId, approval.goal_title || 'Goal', now).run();
+    await db.insert(schema.activityFeed).values({
+      id: crypto.randomUUID(),
+      companyId: companyId,
+      actorId: userId,
+      actorName: userId,
+      action: 'reward_approved',
+      entityType: 'reward_approval',
+      entityId: approvalId,
+      entityTitle: approval.goalId || 'Reward Approval',
+      createdAt: now,
+    });
 
     // Audit log [C2][C18]
-    await writeAuditLog(c.env, {
+    await writeAuditLog({
       companyId,
       entityType: 'financial',
       entityId: approvalId,
@@ -180,7 +258,9 @@ rewardRoutes.put('/:id/approve', requireAdmin(), async (c) => {
       isCritical: true,
     });
 
-    const updated = await c.env.DB.prepare('SELECT * FROM reward_approvals WHERE id = ?').bind(approvalId).first();
+    const updated = await db.query.rewardApprovals.findFirst({
+      where: eq(schema.rewardApprovals.id, approvalId),
+    });
 
     return c.json({ success: true, data: updated });
   } catch (err) {
@@ -192,7 +272,8 @@ rewardRoutes.put('/:id/approve', requireAdmin(), async (c) => {
 // Reject reward [C10]
 rewardRoutes.put('/:id/reject', requireAdmin(), async (c) => {
   try {
-    const { companyId, userId } = getUser(c);
+    const companyId = c.get('companyId') as string;
+    const userId = c.get('userId') as string;
     const approvalId = c.req.param('id');
     const { reason } = await c.req.json();
 
@@ -200,9 +281,9 @@ rewardRoutes.put('/:id/reject', requireAdmin(), async (c) => {
       return c.json({ success: false, error: 'Lý do từ chối là bắt buộc' }, 400);
     }
 
-    const approval = await c.env.DB.prepare(
-      'SELECT * FROM reward_approvals WHERE id = ? AND company_id = ?'
-    ).bind(approvalId, companyId).first();
+    const approval = await db.query.rewardApprovals.findFirst({
+      where: and(eq(schema.rewardApprovals.id, approvalId), eq(schema.rewardApprovals.companyId, companyId)),
+    });
 
     if (!approval) {
       return c.json({ success: false, error: 'Yêu cầu không tồn tại' }, 404);
@@ -212,31 +293,44 @@ rewardRoutes.put('/:id/reject', requireAdmin(), async (c) => {
       return c.json({ success: false, error: 'Yêu cầu này đã được xử lý' }, 400);
     }
 
-    const now = Date.now();
+    const now = new Date();
 
-    await c.env.DB.prepare(`
-      UPDATE reward_approvals SET status = 'rejected', reviewed_by = ?, reviewed_at = ?, reject_reason = ?
-      WHERE id = ?
-    `).bind(userId, now, reason, approvalId).run();
+    await db
+      .update(schema.rewardApprovals)
+      .set({ status: 'rejected', reviewedBy: userId, reviewedAt: now, rejectReason: reason })
+      .where(eq(schema.rewardApprovals.id, approvalId));
 
     // Notify requester [C19]
-    await c.env.DB.prepare(`
-      INSERT INTO notifications (
-        id, company_id, user_id, type, title, content, entity_type, entity_id, is_read, created_at
-      ) VALUES (?, ?, ?, 'reward_rejected', 'Phần thưởng bị từ chối', ?, 'reward_approval', ?, 0, ?)
-    `).bind(
-      crypto.randomUUID(), companyId, approval.requested_by,
-      `Lý do: ${reason}`, approvalId, now
-    ).run();
+    if (approval.requestedBy) {
+      await db.insert(schema.notifications).values({
+        id: crypto.randomUUID(),
+        companyId: companyId,
+        userId: approval.requestedBy,
+        type: 'reward_rejected',
+        title: 'Phần thưởng bị từ chối',
+        content: `Lý do: ${reason}`,
+        entityType: 'reward_approval',
+        entityId: approvalId,
+        isRead: 0,
+        createdAt: now,
+      });
+    }
 
     // Write to activity feed
-    await c.env.DB.prepare(`
-      INSERT INTO activity_feed (id, company_id, actor_id, actor_name, action, entity_type, entity_id, entity_title, created_at)
-      VALUES (?, ?, ?, ?, 'reward_rejected', 'reward_approval', ?, ?, ?)
-    `).bind(crypto.randomUUID(), companyId, userId, userId, approvalId, approval.goal_title || 'Goal', now).run();
+    await db.insert(schema.activityFeed).values({
+      id: crypto.randomUUID(),
+      companyId: companyId,
+      actorId: userId,
+      actorName: userId,
+      action: 'reward_rejected',
+      entityType: 'reward_approval',
+      entityId: approvalId,
+      entityTitle: approval.goalId || 'Reward Approval',
+      createdAt: now,
+    });
 
     // Audit log [C2][C18]
-    await writeAuditLog(c.env, {
+    await writeAuditLog({
       companyId,
       entityType: 'financial',
       entityId: approvalId,
@@ -248,7 +342,9 @@ rewardRoutes.put('/:id/reject', requireAdmin(), async (c) => {
       isCritical: true,
     });
 
-    const updated = await c.env.DB.prepare('SELECT * FROM reward_approvals WHERE id = ?').bind(approvalId).first();
+    const updated = await db.query.rewardApprovals.findFirst({
+      where: eq(schema.rewardApprovals.id, approvalId),
+    });
 
     return c.json({ success: true, data: updated });
   } catch (err) {

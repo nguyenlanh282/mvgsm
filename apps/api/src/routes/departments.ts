@@ -1,24 +1,37 @@
 import { Hono } from 'hono';
-import { getUser } from '../middleware/auth';
 import { requireAdminOrManager, requireAdmin } from '../middleware/roles';
-import type { Env } from '../types';
+import { db, schema } from '../db';
+import { eq } from 'drizzle-orm';
 
-export const departmentRoutes = new Hono<{ Bindings: Env }>();
+export const departmentRoutes = new Hono();
 
 // Get all departments
 departmentRoutes.get('/', async (c) => {
   try {
-    const { companyId } = getUser(c);
+    const companyId = c.get('companyId');
 
-    const departments = await c.env.DB.prepare(
-      `SELECT d.*, u.name as manager_name
-       FROM departments d
-       LEFT JOIN users u ON d.manager_id = u.id
-       WHERE d.company_id = ?
-       ORDER BY d.name`
-    ).bind(companyId).all();
+    const departments = await db.query.departments.findMany({
+      where: eq(schema.departments.companyId, companyId),
+      orderBy: (departments, { asc }) => [asc(departments.name)],
+    });
 
-    return c.json({ success: true, data: departments.results });
+    // Get manager names
+    const managerIds = departments.map(d => d.managerId).filter(Boolean);
+    const managers = managerIds.length > 0
+      ? await db.query.users.findMany({
+          where: eq(schema.users.id, managerIds[0]),
+        })
+      : [];
+
+    const result = departments.map(dept => {
+      const manager = managers.find(m => m.id === dept.managerId);
+      return {
+        ...dept,
+        manager_name: manager?.name || null,
+      };
+    });
+
+    return c.json({ success: true, data: result });
   } catch (err) {
     console.error('Get departments error:', err);
     return c.json({ success: false, error: 'Lỗi server' }, 500);
@@ -28,23 +41,18 @@ departmentRoutes.get('/', async (c) => {
 // Create department
 departmentRoutes.post('/', requireAdmin(), async (c) => {
   try {
-    const { companyId } = getUser(c);
+    const companyId = c.get('companyId');
     const { name, manager_id } = await c.req.json();
 
     if (!name) {
       return c.json({ success: false, error: 'Tên phòng ban là bắt buộc' }, 400);
     }
 
-    const deptId = crypto.randomUUID();
-
-    await c.env.DB.prepare(`
-      INSERT INTO departments (id, company_id, name, manager_id)
-      VALUES (?, ?, ?, ?)
-    `).bind(deptId, companyId, name, manager_id || null).run();
-
-    const dept = await c.env.DB.prepare(
-      'SELECT * FROM departments WHERE id = ?'
-    ).bind(deptId).first();
+    const [dept] = await db.insert(schema.departments).values({
+      companyId,
+      name,
+      managerId: manager_id || null,
+    }).returning();
 
     return c.json({ success: true, data: dept }, 201);
   } catch (err) {
@@ -56,43 +64,38 @@ departmentRoutes.post('/', requireAdmin(), async (c) => {
 // Update department
 departmentRoutes.put('/:id', requireAdmin(), async (c) => {
   try {
-    const { companyId } = getUser(c);
+    const companyId = c.get('companyId');
     const deptId = c.req.param('id');
     const { name, manager_id } = await c.req.json();
 
-    const existing = await c.env.DB.prepare(
-      'SELECT * FROM departments WHERE id = ? AND company_id = ?'
-    ).bind(deptId, companyId).first();
+    const existing = await db.query.departments.findFirst({
+      where: eq(schema.departments.id, deptId),
+    });
 
-    if (!existing) {
+    if (!existing || existing.companyId !== companyId) {
       return c.json({ success: false, error: 'Phòng ban không tồn tại' }, 404);
     }
 
-    const fields: string[] = [];
-    const values: (string | null)[] = [];
+    const setData: Partial<{
+      name: string;
+      managerId: string | null;
+    }> = {};
 
     if (name !== undefined) {
-      fields.push('name = ?');
-      values.push(name);
+      setData.name = name;
     }
     if (manager_id !== undefined) {
-      fields.push('manager_id = ?');
-      values.push(manager_id || null);
+      setData.managerId = manager_id || null;
     }
 
-    if (fields.length === 0) {
+    if (Object.keys(setData).length === 0) {
       return c.json({ success: false, error: 'Không có gì để cập nhật' }, 400);
     }
 
-    values.push(deptId);
-
-    await c.env.DB.prepare(`
-      UPDATE departments SET ${fields.join(', ')} WHERE id = ?
-    `).bind(...values).run();
-
-    const updated = await c.env.DB.prepare(
-      'SELECT * FROM departments WHERE id = ?'
-    ).bind(deptId).first();
+    const [updated] = await db.update(schema.departments)
+      .set(setData)
+      .where(eq(schema.departments.id, deptId))
+      .returning();
 
     return c.json({ success: true, data: updated });
   } catch (err) {
@@ -104,25 +107,22 @@ departmentRoutes.put('/:id', requireAdmin(), async (c) => {
 // Reassign manager [C22]
 departmentRoutes.put('/:id/manager', requireAdmin(), async (c) => {
   try {
-    const { companyId, userId: currentUserId } = getUser(c);
+    const companyId = c.get('companyId');
     const deptId = c.req.param('id');
     const { manager_id } = await c.req.json();
 
-    const existing = await c.env.DB.prepare(
-      'SELECT * FROM departments WHERE id = ? AND company_id = ?'
-    ).bind(deptId, companyId).first();
+    const existing = await db.query.departments.findFirst({
+      where: eq(schema.departments.id, deptId),
+    });
 
-    if (!existing) {
+    if (!existing || existing.companyId !== companyId) {
       return c.json({ success: false, error: 'Phòng ban không tồn tại' }, 404);
     }
 
-    await c.env.DB.prepare(`
-      UPDATE departments SET manager_id = ? WHERE id = ?
-    `).bind(manager_id || null, deptId).run();
-
-    const updated = await c.env.DB.prepare(
-      'SELECT * FROM departments WHERE id = ?'
-    ).bind(deptId).first();
+    const [updated] = await db.update(schema.departments)
+      .set({ managerId: manager_id || null })
+      .where(eq(schema.departments.id, deptId))
+      .returning();
 
     return c.json({ success: true, data: updated });
   } catch (err) {

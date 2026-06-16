@@ -1,36 +1,39 @@
 import { Hono } from 'hono';
-import { getUser } from '../middleware/auth';
-import type { Env } from '../types';
+import { db, schema } from '../db';
+import { eq, desc } from 'drizzle-orm';
+import type { AuthContext } from '../index';
 
-export const activityRoutes = new Hono<{ Bindings: Env }>();
+export const activityRoutes = new Hono<AuthContext>();
 
 // Get activity feed
 activityRoutes.get('/', async (c) => {
   try {
-    const { companyId } = getUser(c);
+    const companyId = c.get('companyId') as string;
     const { limit, page } = c.req.query();
 
     const pageSize = parseInt(limit) || 20;
     const pageNum = parseInt(page) || 1;
     const offset = (pageNum - 1) * pageSize;
 
-    const activities = await c.env.DB.prepare(`
-      SELECT * FROM activity_feed
-      WHERE company_id = ?
-      ORDER BY created_at DESC
-      LIMIT ? OFFSET ?
-    `).bind(companyId, pageSize, offset).all();
+    const activities = await db
+      .select()
+      .from(schema.activityFeed)
+      .where(eq(schema.activityFeed.companyId, companyId))
+      .orderBy(desc(schema.activityFeed.createdAt))
+      .limit(pageSize)
+      .offset(offset);
 
     // Get total count
-    const totalResult = await c.env.DB.prepare(`
-      SELECT COUNT(*) as total FROM activity_feed WHERE company_id = ?
-    `).bind(companyId).first<{ total: number }>();
+    const totalResult = await db
+      .select({ count: schema.activityFeed.id })
+      .from(schema.activityFeed)
+      .where(eq(schema.activityFeed.companyId, companyId));
 
     return c.json({
       success: true,
       data: {
-        items: activities.results,
-        total: totalResult?.total || 0,
+        items: activities,
+        total: totalResult.length,
         page: pageNum,
         pageSize,
       },

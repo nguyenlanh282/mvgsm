@@ -1,14 +1,17 @@
 import { Hono } from 'hono';
-import { getUser } from '../middleware/auth';
+import { db, schema } from '../db';
+import { eq, and, isNull } from 'drizzle-orm';
 import { calculateGoalProgress, getCurrentWeek, getCurrentYear } from '../utils/progress';
-import type { Env } from '../types';
+import type { WeeklyTracking } from '@mvgsm/shared';
+import type { AuthContext } from '../index';
 
-export const reportRoutes = new Hono<{ Bindings: Env }>();
+export const reportRoutes = new Hono<AuthContext>();
 
 // Get quarterly report data [C8]
 reportRoutes.get('/quarterly', async (c) => {
   try {
-    const { companyId, role } = getUser(c);
+    const companyId = c.get('companyId') as string;
+    const role = c.get('role') as string;
     const { year, quarter } = c.req.query();
 
     const currentYear = year ? parseInt(year) : getCurrentYear();
@@ -19,31 +22,73 @@ reportRoutes.get('/quarterly', async (c) => {
     }
 
     // Get company info
-    const company = await c.env.DB.prepare(
-      'SELECT * FROM companies WHERE id = ?'
-    ).bind(companyId).first();
+    const company = await db.query.companies.findFirst({
+      where: eq(schema.companies.id, companyId),
+    });
 
     // Get goals for this quarter
-    const goals = await c.env.DB.prepare(`
-      SELECT g.*, d.name as department_name
-      FROM goals g
-      LEFT JOIN departments d ON g.owner_dept_id = d.id
-      WHERE g.company_id = ? AND g.year = ? AND g.quarter = ?
-      AND g.deleted_at IS NULL
-    `).bind(companyId, currentYear, currentQuarter).all();
+    const goals = await db
+      .select({
+        id: schema.goals.id,
+        companyId: schema.goals.companyId,
+        category: schema.goals.category,
+        year: schema.goals.year,
+        quarter: schema.goals.quarter,
+        startWeek: schema.goals.startWeek,
+        endWeek: schema.goals.endWeek,
+        title: schema.goals.title,
+        description: schema.goals.description,
+        measure: schema.goals.measure,
+        targetValue: schema.goals.targetValue,
+        currentValue: schema.goals.currentValue,
+        unit: schema.goals.unit,
+        deadline: schema.goals.deadline,
+        weight: schema.goals.weight,
+        ownerDeptId: schema.goals.ownerDeptId,
+        collabDeptIds: schema.goals.collabDeptIds,
+        reward: schema.goals.reward,
+        rewardValue: schema.goals.rewardValue,
+        status: schema.goals.status,
+        createdBy: schema.goals.createdBy,
+        createdAt: schema.goals.createdAt,
+        updatedAt: schema.goals.updatedAt,
+        departmentName: schema.departments.name,
+      })
+      .from(schema.goals)
+      .leftJoin(schema.departments, eq(schema.goals.ownerDeptId, schema.departments.id))
+      .where(
+        and(
+          eq(schema.goals.companyId, companyId),
+          eq(schema.goals.year, currentYear),
+          eq(schema.goals.quarter, currentQuarter),
+          isNull(schema.goals.deletedAt)
+        )
+      );
 
     // Get tracking for each goal
     const goalsWithProgress = await Promise.all(
-      (goals.results || []).map(async (goal: any) => {
-        const tracking = await c.env.DB.prepare(`
-          SELECT * FROM weekly_tracking
-          WHERE goal_id = ? AND year = ?
-        `).bind(goal.id, currentYear).all();
+      goals.map(async (goal) => {
+        const trackingRaw = await db
+          .select()
+          .from(schema.weeklyTracking)
+          .where(and(eq(schema.weeklyTracking.goalId, goal.id), eq(schema.weeklyTracking.year, currentYear)));
+
+        // Cast drizzle result to shared WeeklyTracking format
+        const tracking = trackingRaw.map(t => ({
+          id: t.id,
+          goal_id: t.goalId!,
+          week_number: t.weekNumber,
+          year: t.year,
+          status: t.status,
+          note: t.note ?? undefined,
+          updated_by: t.updatedBy ?? undefined,
+          updated_at: t.updatedAt.getTime(),
+        })) as WeeklyTracking[];
 
         const progress = calculateGoalProgress(
-          goal.start_week,
-          goal.end_week,
-          tracking.results as any[],
+          goal.startWeek,
+          goal.endWeek,
+          tracking,
           getCurrentWeek(),
           currentYear
         );
@@ -51,29 +96,37 @@ reportRoutes.get('/quarterly', async (c) => {
         return {
           ...goal,
           progress,
-          tracking: tracking.results,
+          tracking,
         };
       })
     );
 
     // Get financial data
-    const target = await c.env.DB.prepare(`
-      SELECT * FROM financial_targets WHERE company_id = ? AND year = ?
-    `).bind(companyId, currentYear).first();
+    const target = await db.query.financialTargets.findFirst({
+      where: and(eq(schema.financialTargets.companyId, companyId), eq(schema.financialTargets.year, currentYear)),
+    });
 
     const monthStart = (currentQuarter - 1) * 3 + 1;
     const monthEnd = currentQuarter * 3;
 
-    const actuals = await c.env.DB.prepare(`
-      SELECT * FROM monthly_actuals
-      WHERE company_id = ? AND year = ? AND month >= ? AND month <= ?
-      ORDER BY month
-    `).bind(companyId, currentYear, monthStart, monthEnd).all();
+    const actuals = await db
+      .select()
+      .from(schema.monthlyActuals)
+      .where(
+        and(
+          eq(schema.monthlyActuals.companyId, companyId),
+          eq(schema.monthlyActuals.year, currentYear)
+        )
+      )
+      .orderBy(schema.monthlyActuals.month);
+
+    const filteredActuals = actuals.filter((m) => m.month >= monthStart && m.month <= monthEnd);
 
     // Calculate BCG products
-    const products = await c.env.DB.prepare(`
-      SELECT * FROM products WHERE company_id = ? AND year = ? AND is_active = 1
-    `).bind(companyId, currentYear).all();
+    const products = await db
+      .select()
+      .from(schema.products)
+      .where(and(eq(schema.products.companyId, companyId), eq(schema.products.year, currentYear), eq(schema.products.isActive, 1)));
 
     return c.json({
       success: true,
@@ -84,9 +137,9 @@ reportRoutes.get('/quarterly', async (c) => {
         goals: goalsWithProgress,
         financial: {
           target,
-          actuals: actuals.results,
+          actuals: filteredActuals,
         },
-        products: products.results,
+        products: products,
         generatedAt: new Date().toISOString(),
       },
     });
@@ -99,7 +152,8 @@ reportRoutes.get('/quarterly', async (c) => {
 // Get department report
 reportRoutes.get('/department/:deptId', async (c) => {
   try {
-    const { companyId, role } = getUser(c);
+    const companyId = c.get('companyId') as string;
+    const role = c.get('role') as string;
     const deptId = c.req.param('deptId');
     const { year, quarter } = c.req.query();
 
@@ -110,41 +164,78 @@ reportRoutes.get('/department/:deptId', async (c) => {
     }
 
     // Get department info
-    const department = await c.env.DB.prepare(
-      'SELECT * FROM departments WHERE id = ? AND company_id = ?'
-    ).bind(deptId, companyId).first();
+    const department = await db.query.departments.findFirst({
+      where: and(eq(schema.departments.id, deptId), eq(schema.departments.companyId, companyId)),
+    });
 
     if (!department) {
       return c.json({ success: false, error: 'Phòng ban không tồn tại' }, 404);
     }
 
-    // Get goals for this department
-    let goalsQuery = `
-      SELECT g.*, u.name as manager_name
-      FROM goals g
-      LEFT JOIN users u ON g.owner_dept_id = u.department_id
-      WHERE g.company_id = ? AND g.owner_dept_id = ? AND g.year = ? AND g.deleted_at IS NULL
-    `;
-    const params: (string | number)[] = [companyId, deptId, currentYear];
+    // Build conditions for goals
+    const goalConditions = [
+      eq(schema.goals.companyId, companyId),
+      eq(schema.goals.ownerDeptId, deptId),
+      eq(schema.goals.year, currentYear),
+      isNull(schema.goals.deletedAt),
+    ];
 
     if (quarter) {
-      goalsQuery += ' AND g.quarter = ?';
-      params.push(parseInt(quarter));
+      goalConditions.push(eq(schema.goals.quarter, parseInt(quarter)));
     }
 
-    const goals = await c.env.DB.prepare(goalsQuery).bind(...params).all();
+    const goals = await db
+      .select({
+        id: schema.goals.id,
+        companyId: schema.goals.companyId,
+        category: schema.goals.category,
+        year: schema.goals.year,
+        quarter: schema.goals.quarter,
+        startWeek: schema.goals.startWeek,
+        endWeek: schema.goals.endWeek,
+        title: schema.goals.title,
+        description: schema.goals.description,
+        measure: schema.goals.measure,
+        targetValue: schema.goals.targetValue,
+        currentValue: schema.goals.currentValue,
+        unit: schema.goals.unit,
+        deadline: schema.goals.deadline,
+        weight: schema.goals.weight,
+        ownerDeptId: schema.goals.ownerDeptId,
+        status: schema.goals.status,
+        createdBy: schema.goals.createdBy,
+        createdAt: schema.goals.createdAt,
+        updatedAt: schema.goals.updatedAt,
+        managerName: schema.users.name,
+      })
+      .from(schema.goals)
+      .leftJoin(schema.users, eq(schema.goals.ownerDeptId, schema.users.departmentId))
+      .where(and(...goalConditions));
 
     // Get tracking for each goal
     const goalsWithProgress = await Promise.all(
-      (goals.results || []).map(async (goal: any) => {
-        const tracking = await c.env.DB.prepare(`
-          SELECT * FROM weekly_tracking WHERE goal_id = ? AND year = ?
-        `).bind(goal.id, currentYear).all();
+      goals.map(async (goal) => {
+        const trackingRaw = await db
+          .select()
+          .from(schema.weeklyTracking)
+          .where(and(eq(schema.weeklyTracking.goalId, goal.id), eq(schema.weeklyTracking.year, currentYear)));
+
+        // Cast drizzle result to shared WeeklyTracking format
+        const tracking = trackingRaw.map(t => ({
+          id: t.id,
+          goal_id: t.goalId!,
+          week_number: t.weekNumber,
+          year: t.year,
+          status: t.status,
+          note: t.note ?? undefined,
+          updated_by: t.updatedBy ?? undefined,
+          updated_at: t.updatedAt.getTime(),
+        })) as WeeklyTracking[];
 
         const progress = calculateGoalProgress(
-          goal.start_week,
-          goal.end_week,
-          tracking.results as any[],
+          goal.startWeek,
+          goal.endWeek,
+          tracking,
           getCurrentWeek(),
           currentYear
         );

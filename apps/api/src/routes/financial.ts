@@ -1,21 +1,21 @@
 import { Hono } from 'hono';
-import { getUser } from '../middleware/auth';
+import { db, schema } from '../db';
+import { eq, and, desc } from 'drizzle-orm';
 import { requireAdminOrManager } from '../middleware/roles';
 import { writeAuditLog } from '../utils/audit';
 import { getCurrentYear } from '../utils/progress';
-import type { Env } from '../types';
 
-export const financialRoutes = new Hono<{ Bindings: Env }>();
+export const financialRoutes = new Hono();
 
 // Get financial targets for a year
 financialRoutes.get('/targets/:year', async (c) => {
   try {
-    const { companyId } = getUser(c);
+    const companyId = c.get('companyId');
     const year = parseInt(c.req.param('year'));
 
-    const target = await c.env.DB.prepare(`
-      SELECT * FROM financial_targets WHERE company_id = ? AND year = ?
-    `).bind(companyId, year).first();
+    const target = await db.query.financialTargets.findFirst({
+      where: and(eq(schema.financialTargets.companyId, companyId), eq(schema.financialTargets.year, year))
+    });
 
     return c.json({ success: true, data: target || null });
   } catch (err) {
@@ -27,38 +27,38 @@ financialRoutes.get('/targets/:year', async (c) => {
 // Update financial targets
 financialRoutes.put('/targets/:year', requireAdminOrManager(), async (c) => {
   try {
-    const { companyId, userId } = getUser(c);
+    const companyId = c.get('companyId');
+    const userId = c.get('userId');
     const year = parseInt(c.req.param('year'));
     const data = await c.req.json();
 
-    const existing = await c.env.DB.prepare(`
-      SELECT * FROM financial_targets WHERE company_id = ? AND year = ?
-    `).bind(companyId, year).first();
-
-    const now = Date.now();
+    const existing = await db.query.financialTargets.findFirst({
+      where: and(eq(schema.financialTargets.companyId, companyId), eq(schema.financialTargets.year, year))
+    });
 
     if (existing) {
-      await c.env.DB.prepare(`
-        UPDATE financial_targets
-        SET revenue_target = ?, cost_ratio_target = ?, profit_ratio_target = ?
-        WHERE company_id = ? AND year = ?
-      `).bind(
-        data.revenue_target ?? existing.revenue_target,
-        data.cost_ratio_target ?? existing.cost_ratio_target,
-        data.profit_ratio_target ?? existing.profit_ratio_target,
-        companyId, year
-      ).run();
+      await db.update(schema.financialTargets)
+        .set({
+          revenueTarget: data.revenueTarget ?? existing.revenueTarget,
+          costRatioTarget: data.costRatioTarget ?? existing.costRatioTarget,
+          profitRatioTarget: data.profitRatioTarget ?? existing.profitRatioTarget,
+        })
+        .where(and(eq(schema.financialTargets.companyId, companyId), eq(schema.financialTargets.year, year)));
     } else {
       const id = crypto.randomUUID();
-      await c.env.DB.prepare(`
-        INSERT INTO financial_targets (id, company_id, year, revenue_target, cost_ratio_target, profit_ratio_target)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).bind(id, companyId, year, data.revenue_target, data.cost_ratio_target || null, data.profit_ratio_target || null).run();
+      await db.insert(schema.financialTargets).values({
+        id,
+        companyId,
+        year,
+        revenueTarget: data.revenueTarget,
+        costRatioTarget: data.costRatioTarget ?? null,
+        profitRatioTarget: data.profitRatioTarget ?? null,
+      });
     }
 
-    const updated = await c.env.DB.prepare(`
-      SELECT * FROM financial_targets WHERE company_id = ? AND year = ?
-    `).bind(companyId, year).first();
+    const updated = await db.query.financialTargets.findFirst({
+      where: and(eq(schema.financialTargets.companyId, companyId), eq(schema.financialTargets.year, year))
+    });
 
     return c.json({ success: true, data: updated });
   } catch (err) {
@@ -70,26 +70,23 @@ financialRoutes.put('/targets/:year', requireAdminOrManager(), async (c) => {
 // Get monthly actuals
 financialRoutes.get('/actuals/:year', async (c) => {
   try {
-    const { companyId } = getUser(c);
+    const companyId = c.get('companyId');
     const year = parseInt(c.req.param('year'));
 
-    const actuals = await c.env.DB.prepare(`
-      SELECT m.*, u.name as updater_name
-      FROM monthly_actuals m
-      LEFT JOIN users u ON m.updated_by = u.id
-      WHERE m.company_id = ? AND m.year = ?
-      ORDER BY m.month
-    `).bind(companyId, year).all();
+    const actuals = await db.query.monthlyActuals.findMany({
+      where: and(eq(schema.monthlyActuals.companyId, companyId), eq(schema.monthlyActuals.year, year)),
+      orderBy: desc(schema.monthlyActuals.month),
+    });
 
     // Also get targets
-    const target = await c.env.DB.prepare(`
-      SELECT * FROM financial_targets WHERE company_id = ? AND year = ?
-    `).bind(companyId, year).first();
+    const target = await db.query.financialTargets.findFirst({
+      where: and(eq(schema.financialTargets.companyId, companyId), eq(schema.financialTargets.year, year))
+    });
 
     return c.json({
       success: true,
       data: {
-        actuals: actuals.results,
+        actuals,
         target,
         year,
       },
@@ -103,7 +100,8 @@ financialRoutes.get('/actuals/:year', async (c) => {
 // Update monthly actual
 financialRoutes.put('/actuals/:year/:month', requireAdminOrManager(), async (c) => {
   try {
-    const { companyId, userId } = getUser(c);
+    const companyId = c.get('companyId');
+    const userId = c.get('userId');
     const year = parseInt(c.req.param('year'));
     const month = parseInt(c.req.param('month'));
     const data = await c.req.json();
@@ -112,45 +110,64 @@ financialRoutes.put('/actuals/:year/:month', requireAdminOrManager(), async (c) 
       return c.json({ success: false, error: 'Tháng không hợp lệ' }, 400);
     }
 
-    const now = Date.now();
-
-    const existing = await c.env.DB.prepare(`
-      SELECT * FROM monthly_actuals WHERE company_id = ? AND year = ? AND month = ?
-    `).bind(companyId, year, month).first();
+    const existing = await db.query.monthlyActuals.findFirst({
+      where: and(
+        eq(schema.monthlyActuals.companyId, companyId),
+        eq(schema.monthlyActuals.year, year),
+        eq(schema.monthlyActuals.month, month)
+      )
+    });
 
     if (existing) {
-      await c.env.DB.prepare(`
-        UPDATE monthly_actuals
-        SET revenue = ?, cost = ?, profit = ?, updated_by = ?, updated_at = ?
-        WHERE company_id = ? AND year = ? AND month = ?
-      `).bind(
-        data.revenue ?? existing.revenue,
-        data.cost ?? existing.cost,
-        data.profit ?? existing.profit,
-        userId, now,
-        companyId, year, month
-      ).run();
+      await db.update(schema.monthlyActuals)
+        .set({
+          revenue: data.revenue ?? existing.revenue,
+          cost: data.cost ?? existing.cost,
+          profit: data.profit ?? existing.profit,
+          updatedBy: userId,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(schema.monthlyActuals.companyId, companyId),
+          eq(schema.monthlyActuals.year, year),
+          eq(schema.monthlyActuals.month, month)
+        ));
     } else {
       const id = crypto.randomUUID();
-      await c.env.DB.prepare(`
-        INSERT INTO monthly_actuals (id, company_id, year, month, revenue, cost, profit, updated_by, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(id, companyId, year, month, data.revenue || null, data.cost || null, data.profit || null, userId, now).run();
+      await db.insert(schema.monthlyActuals).values({
+        id,
+        companyId,
+        year,
+        month,
+        revenue: data.revenue ?? null,
+        cost: data.cost ?? null,
+        profit: data.profit ?? null,
+        updatedBy: userId,
+        updatedAt: new Date(),
+      });
     }
 
     // Write to activity feed
-    await c.env.DB.prepare(`
-      INSERT INTO activity_feed (id, company_id, actor_id, actor_name, action, entity_type, entity_id, entity_title, meta, created_at)
-      VALUES (?, ?, ?, ?, 'financial_updated', 'monthly_actuals', ?, ?, ?, ?)
-    `).bind(
-      crypto.randomUUID(), companyId, userId, userId,
-      `${year}-${month}`, `Doanh thu tháng ${month}`,
-      JSON.stringify({ revenue: data.revenue }), now
-    ).run();
+    await db.insert(schema.activityFeed).values({
+      id: crypto.randomUUID(),
+      companyId,
+      actorId: userId,
+      actorName: userId,
+      action: 'financial_updated',
+      entityType: 'monthly_actuals',
+      entityId: `${year}-${month}`,
+      entityTitle: `Doanh thu tháng ${month}`,
+      meta: { revenue: data.revenue },
+      createdAt: new Date(),
+    });
 
-    const updated = await c.env.DB.prepare(`
-      SELECT * FROM monthly_actuals WHERE company_id = ? AND year = ? AND month = ?
-    `).bind(companyId, year, month).first();
+    const updated = await db.query.monthlyActuals.findFirst({
+      where: and(
+        eq(schema.monthlyActuals.companyId, companyId),
+        eq(schema.monthlyActuals.year, year),
+        eq(schema.monthlyActuals.month, month)
+      )
+    });
 
     return c.json({ success: true, data: updated });
   } catch (err) {
@@ -163,30 +180,30 @@ financialRoutes.put('/actuals/:year/:month', requireAdminOrManager(), async (c) 
 // Formula: Revenue = KHTN × Conversion Rate × Transactions per customer × AOV × Profit Margin
 financialRoutes.get('/fiveway/:year', async (c) => {
   try {
-    const { companyId } = getUser(c);
+    const companyId = c.get('companyId');
     const year = parseInt(c.req.param('year'));
     const { quarter } = c.req.query();
 
     // Get monthly actuals
-    const actuals = await c.env.DB.prepare(`
-      SELECT * FROM monthly_actuals WHERE company_id = ? AND year = ?
-      ORDER BY month
-    `).bind(companyId, year).all();
+    const actuals = await db.query.monthlyActuals.findMany({
+      where: and(eq(schema.monthlyActuals.companyId, companyId), eq(schema.monthlyActuals.year, year)),
+      orderBy: desc(schema.monthlyActuals.month),
+    });
 
     // Get targets
-    const target = await c.env.DB.prepare(`
-      SELECT * FROM financial_targets WHERE company_id = ? AND year = ?
-    `).bind(companyId, year).first();
+    const target = await db.query.financialTargets.findFirst({
+      where: and(eq(schema.financialTargets.companyId, companyId), eq(schema.financialTargets.year, year))
+    });
 
     // Get previous year data for comparison
     const prevYear = year - 1;
-    const prevActuals = await c.env.DB.prepare(`
-      SELECT * FROM monthly_actuals WHERE company_id = ? AND year = ?
-      ORDER BY month
-    `).bind(companyId, prevYear).all();
+    const prevActuals = await db.query.monthlyActuals.findMany({
+      where: and(eq(schema.monthlyActuals.companyId, companyId), eq(schema.monthlyActuals.year, prevYear)),
+      orderBy: desc(schema.monthlyActuals.month),
+    });
 
-    const monthlyData = actuals.results as any[];
-    const prevMonthlyData = prevActuals.results as any[];
+    const monthlyData = actuals as any[];
+    const prevMonthlyData = prevActuals as any[];
 
     // Calculate totals
     const totalRevenue = monthlyData.reduce((sum: number, m: any) => sum + (m.revenue || 0), 0);
@@ -203,13 +220,12 @@ financialRoutes.get('/fiveway/:year', async (c) => {
     // For now, we calculate based on available data and estimate the rest
 
     // Get personal KPI data to estimate conversion rates
-    const kpiData = await c.env.DB.prepare(`
-      SELECT AVG(conversion_rate) as avg_conversion, AVG(avg_order_value) as avg_aov
-      FROM personal_kpi WHERE year = ?
-    `).bind(year).first();
+    const kpiData = await db.query.personalKpi.findFirst({
+      where: eq(schema.personalKpi.year, year)
+    });
 
-    const conversionRate = kpiData?.avg_conversion || 5; // Default 5% if no data
-    const avgOrderValue = kpiData?.avg_aov || 1000000; // Default 1M if no data
+    const conversionRate = kpiData?.conversionRate || 5; // Default 5% if no data
+    const avgOrderValue = kpiData?.avgOrderValue || 1000000; // Default 1M if no data
 
     // Estimate KHTN and transactions from revenue
     // Revenue = KHTN × Conversion × Transactions × AOV × Margin
@@ -257,7 +273,7 @@ financialRoutes.get('/fiveway/:year', async (c) => {
           avgOrderValue,
           profitMargin,
           totalRevenue,
-          targetRevenue: target?.revenue_target || 0,
+          targetRevenue: target?.revenueTarget || 0,
         }),
       },
     });
@@ -284,25 +300,25 @@ function generateFiveWaySuggestions(data: {
   if (targetRevenue > 0) {
     const percentOfTarget = (totalRevenue / targetRevenue) * 100
     if (percentOfTarget < 70) {
-      suggestions.push(`⚠️ Doanh thu mới đạt ${percentOfTarget.toFixed(1)}% kế hoạch. Cần tăng cường các biện pháp thúc đẩy.`)
+      suggestions.push(`Doanh thu mới đạt ${percentOfTarget.toFixed(1)}% kế hoạch. Cần tăng cường các biện pháp thúc đẩy.`)
     }
   }
 
   // Check profit margin
   if (data.profitMargin < 10) {
-    suggestions.push(`📉 Biên lợi nhuận thấp (${data.profitMargin.toFixed(1)}%). Cần xem xét cắt giảm chi phí hoặc tăng giá bán.`)
+    suggestions.push(`Biên lợi nhuận thấp (${data.profitMargin.toFixed(1)}%). Cần xem xét cắt giảm chi phí hoặc tăng giá bán.`)
   } else if (data.profitMargin > 30) {
-    suggestions.push(`✅ Biên lợi nhuận tốt (${data.profitMargin.toFixed(1)}%). Duy trì chiến lược hiện tại.`)
+    suggestions.push(`Biên lợi nhuận tốt (${data.profitMargin.toFixed(1)}%). Duy trì chiến lược hiện tại.`)
   }
 
   // Check conversion rate
   if (data.conversionRate < 3) {
-    suggestions.push(`📊 Tỷ lệ chuyển đổi thấp (${data.conversionRate.toFixed(1)}%). Cần cải thiện chất lượng chăm sóc khách hàng.`)
+    suggestions.push(`Tỷ lệ chuyển đổi thấp (${data.conversionRate.toFixed(1)}%). Cần cải thiện chất lượng chăm sóc khách hàng.`)
   }
 
   // Check avg order value
   if (data.avgOrderValue < 500000) {
-    suggestions.push(`💰 Giá trị đơn hàng trung bình thấp. Cân nhắc upsell/cross-sell để tăng AOV.`)
+    suggestions.push(`Giá trị đơn hàng trung bình thấp. Cân nhắc upsell/cross-sell để tăng AOV.`)
   }
 
   return suggestions

@@ -1,29 +1,40 @@
 import { Hono } from 'hono';
-import { getUser } from '../middleware/auth';
+import { db, schema } from '../db';
+import { eq, and, isNull } from 'drizzle-orm';
 import { parseMentions } from '../utils/progress';
-import type { Env } from '../types';
+import type { AuthContext } from '../index';
 
-export const commentRoutes = new Hono<{ Bindings: Env }>();
+export const commentRoutes = new Hono<AuthContext>();
 
 // Get comments for a goal
 commentRoutes.get('/goals/:id/comments', async (c) => {
   try {
-    const { companyId, role } = getUser(c);
+    const companyId = c.get('companyId') as string;
+    const role = c.get('role') as string;
     const goalId = c.req.param('id');
 
     if (role === 'finance') {
       return c.json({ success: false, error: 'Finance không có quyền truy cập' }, 403);
     }
 
-    const comments = await c.env.DB.prepare(`
-      SELECT c.*, u.name as author_name
-      FROM goal_comments c
-      JOIN users u ON c.author_id = u.id
-      WHERE c.goal_id = ? AND c.deleted_at IS NULL
-      ORDER BY c.created_at ASC
-    `).bind(goalId).all();
+    const comments = await db
+      .select({
+        id: schema.goalComments.id,
+        goalId: schema.goalComments.goalId,
+        companyId: schema.goalComments.companyId,
+        authorId: schema.goalComments.authorId,
+        content: schema.goalComments.content,
+        mentions: schema.goalComments.mentions,
+        createdAt: schema.goalComments.createdAt,
+        updatedAt: schema.goalComments.updatedAt,
+        deletedAt: schema.goalComments.deletedAt,
+        authorName: schema.users.name,
+      })
+      .from(schema.goalComments)
+      .leftJoin(schema.users, eq(schema.goalComments.authorId, schema.users.id))
+      .where(and(eq(schema.goalComments.goalId, goalId), isNull(schema.goalComments.deletedAt)));
 
-    return c.json({ success: true, data: comments.results });
+    return c.json({ success: true, data: comments });
   } catch (err) {
     console.error('Get comments error:', err);
     return c.json({ success: false, error: 'Lỗi server' }, 500);
@@ -33,7 +44,8 @@ commentRoutes.get('/goals/:id/comments', async (c) => {
 // Add comment to a goal [C24]
 commentRoutes.post('/goals/:id/comments', async (c) => {
   try {
-    const { companyId, userId } = getUser(c);
+    const companyId = c.get('companyId') as string;
+    const userId = c.get('userId') as string;
     const goalId = c.req.param('id');
     const { content } = await c.req.json();
 
@@ -42,9 +54,9 @@ commentRoutes.post('/goals/:id/comments', async (c) => {
     }
 
     // Verify goal exists
-    const goal = await c.env.DB.prepare(
-      'SELECT id, title FROM goals WHERE id = ? AND company_id = ?'
-    ).bind(goalId, companyId).first();
+    const goal = await db.query.goals.findFirst({
+      where: and(eq(schema.goals.id, goalId), eq(schema.goals.companyId, companyId)),
+    });
 
     if (!goal) {
       return c.json({ success: false, error: 'Mục tiêu không tồn tại' }, 404);
@@ -54,48 +66,74 @@ commentRoutes.post('/goals/:id/comments', async (c) => {
     const mentions = parseMentions(content);
 
     const commentId = crypto.randomUUID();
-    const now = Date.now();
+    const now = new Date();
 
-    await c.env.DB.prepare(`
-      INSERT INTO goal_comments (id, goal_id, company_id, author_id, content, mentions, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(commentId, goalId, companyId, userId, content, JSON.stringify(mentions), now, now).run();
+    await db.insert(schema.goalComments).values({
+      id: commentId,
+      goalId: goalId,
+      companyId: companyId,
+      authorId: userId,
+      content: content,
+      mentions: mentions,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     // Create notifications for mentioned users [C19]
     if (mentions.length > 0) {
       for (const mentionedUserId of mentions) {
         // Check if user exists in company
-        const mentionedUser = await c.env.DB.prepare(`
-          SELECT id FROM users WHERE id = ? AND company_id = ?
-        `).bind(mentionedUserId, companyId).first();
+        const mentionedUser = await db.query.users.findFirst({
+          where: and(eq(schema.users.id, mentionedUserId), eq(schema.users.companyId, companyId)),
+        });
 
         if (mentionedUser) {
-          await c.env.DB.prepare(`
-            INSERT INTO notifications (
-              id, company_id, user_id, type, title, content, entity_type, entity_id, is_read, created_at
-            ) VALUES (?, ?, ?, 'mention', 'Bạn được nhắc đến trong bình luận', ?, 'comment', ?, 0, ?)
-          `).bind(
-            crypto.randomUUID(), companyId, mentionedUserId,
-            `Nhắc đến bạn trong "${goal.title}"`, commentId, now
-          ).run();
+          await db.insert(schema.notifications).values({
+            id: crypto.randomUUID(),
+            companyId: companyId,
+            userId: mentionedUserId,
+            type: 'mention',
+            title: 'Bạn được nhắc đến trong bình luận',
+            content: `Nhắc đến bạn trong "${goal.title}"`,
+            entityType: 'comment',
+            entityId: commentId,
+            isRead: 0,
+            createdAt: now,
+          });
         }
       }
     }
 
     // Add to activity feed
-    await c.env.DB.prepare(`
-      INSERT INTO activity_feed (id, company_id, actor_id, actor_name, action, entity_type, entity_id, entity_title, created_at)
-      VALUES (?, ?, ?, ?, 'comment_added', 'comment', ?, ?, ?)
-    `).bind(crypto.randomUUID(), companyId, userId, userId, commentId, goal.title, now).run();
+    await db.insert(schema.activityFeed).values({
+      id: crypto.randomUUID(),
+      companyId: companyId,
+      actorId: userId,
+      actorName: userId,
+      action: 'comment_added',
+      entityType: 'comment',
+      entityId: commentId,
+      entityTitle: goal.title,
+      createdAt: now,
+    });
 
-    const comment = await c.env.DB.prepare(`
-      SELECT c.*, u.name as author_name
-      FROM goal_comments c
-      JOIN users u ON c.author_id = u.id
-      WHERE c.id = ?
-    `).bind(commentId).first();
+    const comment = await db
+      .select({
+        id: schema.goalComments.id,
+        goalId: schema.goalComments.goalId,
+        companyId: schema.goalComments.companyId,
+        authorId: schema.goalComments.authorId,
+        content: schema.goalComments.content,
+        mentions: schema.goalComments.mentions,
+        createdAt: schema.goalComments.createdAt,
+        updatedAt: schema.goalComments.updatedAt,
+        authorName: schema.users.name,
+      })
+      .from(schema.goalComments)
+      .leftJoin(schema.users, eq(schema.goalComments.authorId, schema.users.id))
+      .where(eq(schema.goalComments.id, commentId));
 
-    return c.json({ success: true, data: comment }, 201);
+    return c.json({ success: true, data: comment[0] }, 201);
   } catch (err) {
     console.error('Add comment error:', err);
     return c.json({ success: false, error: 'Lỗi server' }, 500);
@@ -105,32 +143,34 @@ commentRoutes.post('/goals/:id/comments', async (c) => {
 // Update comment (author only, within 5 minutes)
 commentRoutes.put('/:id', async (c) => {
   try {
-    const { userId } = getUser(c);
+    const userId = c.get('userId') as string;
     const commentId = c.req.param('id');
     const { content } = await c.req.json();
 
-    const comment = await c.env.DB.prepare(
-      'SELECT * FROM goal_comments WHERE id = ? AND author_id = ?'
-    ).bind(commentId, userId).first();
+    const comment = await db.query.goalComments.findFirst({
+      where: and(eq(schema.goalComments.id, commentId), eq(schema.goalComments.authorId, userId)),
+    });
 
     if (!comment) {
       return c.json({ success: false, error: 'Bình luận không tồn tại hoặc bạn không có quyền sửa' }, 404);
     }
 
     // Check 5-minute window
-    const ageMinutes = (Date.now() - comment.created_at) / 1000 / 60;
+    const ageMinutes = (Date.now() - comment.createdAt.getTime()) / 1000 / 60;
     if (ageMinutes > 5) {
       return c.json({ success: false, error: 'Chỉ có thể sửa bình luận trong 5 phút đầu' }, 400);
     }
 
     const mentions = parseMentions(content);
 
-    await c.env.DB.prepare(`
-      UPDATE goal_comments SET content = ?, mentions = ?, updated_at = ?
-      WHERE id = ?
-    `).bind(content, JSON.stringify(mentions), Date.now(), commentId).run();
+    await db
+      .update(schema.goalComments)
+      .set({ content: content, mentions: mentions, updatedAt: new Date() })
+      .where(eq(schema.goalComments.id, commentId));
 
-    const updated = await c.env.DB.prepare('SELECT * FROM goal_comments WHERE id = ?').bind(commentId).first();
+    const updated = await db.query.goalComments.findFirst({
+      where: eq(schema.goalComments.id, commentId),
+    });
 
     return c.json({ success: true, data: updated });
   } catch (err) {
@@ -142,25 +182,27 @@ commentRoutes.put('/:id', async (c) => {
 // Delete comment (soft delete)
 commentRoutes.delete('/:id', async (c) => {
   try {
-    const { userId, role } = getUser(c);
+    const userId = c.get('userId') as string;
+    const role = c.get('role') as string;
     const commentId = c.req.param('id');
 
-    const comment = await c.env.DB.prepare(
-      'SELECT * FROM goal_comments WHERE id = ?'
-    ).bind(commentId).first();
+    const comment = await db.query.goalComments.findFirst({
+      where: eq(schema.goalComments.id, commentId),
+    });
 
     if (!comment) {
       return c.json({ success: false, error: 'Bình luận không tồn tại' }, 404);
     }
 
     // Only author or admin can delete
-    if (comment.author_id !== userId && role !== 'admin') {
+    if (comment.authorId !== userId && role !== 'admin') {
       return c.json({ success: false, error: 'Bạn không có quyền xóa bình luận này' }, 403);
     }
 
-    await c.env.DB.prepare(`
-      UPDATE goal_comments SET deleted_at = ? WHERE id = ?
-    `).bind(Date.now(), commentId).run();
+    await db
+      .update(schema.goalComments)
+      .set({ deletedAt: new Date() })
+      .where(eq(schema.goalComments.id, commentId));
 
     return c.json({ success: true });
   } catch (err) {

@@ -18,7 +18,7 @@ import { commentRoutes } from './routes/comments'
 import { reportRoutes } from './routes/reports'
 
 // Type for authenticated context
-type AuthContext = {
+export type AuthContext = {
   Variables: {
     userId: string
     companyId: string

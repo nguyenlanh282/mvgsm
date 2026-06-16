@@ -1,17 +1,17 @@
 import { Hono } from 'hono';
-import { getUser } from '../middleware/auth';
-import type { Env } from '../types';
+import { db, schema } from '../db';
+import { eq } from 'drizzle-orm';
 
-export const companyRoutes = new Hono<{ Bindings: Env }>();
+export const companyRoutes = new Hono();
 
 // Get company info
 companyRoutes.get('/', async (c) => {
   try {
-    const { companyId } = getUser(c);
+    const companyId = c.get('companyId');
 
-    const company = await c.env.DB.prepare(
-      'SELECT * FROM companies WHERE id = ?'
-    ).bind(companyId).first();
+    const company = await db.query.companies.findFirst({
+      where: eq(schema.companies.id, companyId),
+    });
 
     if (!company) {
       return c.json({ success: false, error: 'Công ty không tồn tại' }, 404);
@@ -27,45 +27,44 @@ companyRoutes.get('/', async (c) => {
 // Update company info (admin only)
 companyRoutes.put('/', async (c) => {
   try {
-    const { companyId } = getUser(c);
+    const companyId = c.get('companyId');
     const updates = await c.req.json();
-    const now = Date.now();
 
-    const fields: string[] = [];
-    const values: (string | number)[] = [];
+    const setData: Partial<{
+      name: string;
+      mission: string | null;
+      vision: string | null;
+      coreValues: string | null;
+      rewardPolicy: string | null;
+      updatedAt: Date;
+    }> = {};
 
     if (updates.name !== undefined) {
-      fields.push('name = ?');
-      values.push(updates.name);
+      setData.name = updates.name;
     }
     if (updates.mission !== undefined) {
-      fields.push('mission = ?');
-      values.push(updates.mission);
+      setData.mission = updates.mission;
     }
     if (updates.vision !== undefined) {
-      fields.push('vision = ?');
-      values.push(updates.vision);
+      setData.vision = updates.vision;
     }
     if (updates.core_values !== undefined) {
-      fields.push('core_values = ?');
-      values.push(updates.core_values);
+      setData.coreValues = updates.core_values;
     }
     if (updates.reward_policy !== undefined) {
-      fields.push('reward_policy = ?');
-      values.push(updates.reward_policy);
+      setData.rewardPolicy = updates.reward_policy;
     }
 
-    fields.push('updated_at = ?');
-    values.push(now);
-    values.push(companyId);
+    if (Object.keys(setData).length === 0) {
+      return c.json({ success: false, error: 'Không có gì để cập nhật' }, 400);
+    }
 
-    await c.env.DB.prepare(`
-      UPDATE companies SET ${fields.join(', ')} WHERE id = ?
-    `).bind(...values).run();
+    setData.updatedAt = new Date();
 
-    const updated = await c.env.DB.prepare(
-      'SELECT * FROM companies WHERE id = ?'
-    ).bind(companyId).first();
+    const [updated] = await db.update(schema.companies)
+      .set(setData)
+      .where(eq(schema.companies.id, companyId))
+      .returning();
 
     return c.json({ success: true, data: updated });
   } catch (err) {

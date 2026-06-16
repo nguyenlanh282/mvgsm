@@ -1,36 +1,43 @@
 import { Hono } from 'hono';
-import { getUser } from '../middleware/auth';
-import type { Env } from '../types';
+import { db, schema } from '../db';
+import { eq, and, desc } from 'drizzle-orm';
+import type { AuthContext } from '../index';
 
-export const notificationRoutes = new Hono<{ Bindings: Env }>();
+export const notificationRoutes = new Hono<AuthContext>();
 
 // Get notifications for current user
 notificationRoutes.get('/', async (c) => {
   try {
-    const { userId, companyId } = getUser(c);
+    const userId = c.get('userId') as string;
+    const companyId = c.get('companyId') as string;
     const { is_read, limit } = c.req.query();
 
-    let query = `
-      SELECT * FROM notifications
-      WHERE user_id = ? AND company_id = ?
-    `;
-    const params: (string | number)[] = [userId, companyId];
+    const conditions = [
+      eq(schema.notifications.userId, userId),
+      eq(schema.notifications.companyId, companyId),
+    ];
 
     if (is_read !== undefined) {
-      query += ' AND is_read = ?';
-      params.push(is_read === 'true' ? 1 : 0);
+      conditions.push(eq(schema.notifications.isRead, is_read === 'true' ? 1 : 0));
     }
 
-    query += ' ORDER BY created_at DESC';
-
+    let notifications;
     if (limit) {
-      query += ' LIMIT ?';
-      params.push(parseInt(limit));
+      notifications = await db
+        .select()
+        .from(schema.notifications)
+        .where(and(...conditions))
+        .orderBy(desc(schema.notifications.createdAt))
+        .limit(parseInt(limit));
+    } else {
+      notifications = await db
+        .select()
+        .from(schema.notifications)
+        .where(and(...conditions))
+        .orderBy(desc(schema.notifications.createdAt));
     }
 
-    const notifications = await c.env.DB.prepare(query).bind(...params).all();
-
-    return c.json({ success: true, data: notifications.results });
+    return c.json({ success: true, data: notifications });
   } catch (err) {
     console.error('Get notifications error:', err);
     return c.json({ success: false, error: 'Lỗi server' }, 500);
@@ -40,14 +47,14 @@ notificationRoutes.get('/', async (c) => {
 // Get unread count
 notificationRoutes.get('/count-unread', async (c) => {
   try {
-    const { userId } = getUser(c);
+    const userId = c.get('userId') as string;
 
-    const result = await c.env.DB.prepare(`
-      SELECT COUNT(*) as count FROM notifications
-      WHERE user_id = ? AND is_read = 0
-    `).bind(userId).first<{ count: number }>();
+    const result = await db
+      .select({ count: schema.notifications.id })
+      .from(schema.notifications)
+      .where(and(eq(schema.notifications.userId, userId), eq(schema.notifications.isRead, 0)));
 
-    return c.json({ success: true, data: { count: result?.count || 0 } });
+    return c.json({ success: true, data: { count: result.length } });
   } catch (err) {
     console.error('Get unread count error:', err);
     return c.json({ success: false, error: 'Lỗi server' }, 500);
@@ -57,12 +64,13 @@ notificationRoutes.get('/count-unread', async (c) => {
 // Mark as read
 notificationRoutes.put('/:id/read', async (c) => {
   try {
-    const { userId } = getUser(c);
+    const userId = c.get('userId') as string;
     const notificationId = c.req.param('id');
 
-    await c.env.DB.prepare(`
-      UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?
-    `).bind(notificationId, userId).run();
+    await db
+      .update(schema.notifications)
+      .set({ isRead: 1 })
+      .where(and(eq(schema.notifications.id, notificationId), eq(schema.notifications.userId, userId)));
 
     return c.json({ success: true });
   } catch (err) {
@@ -74,11 +82,12 @@ notificationRoutes.put('/:id/read', async (c) => {
 // Mark all as read
 notificationRoutes.put('/read-all', async (c) => {
   try {
-    const { userId } = getUser(c);
+    const userId = c.get('userId') as string;
 
-    await c.env.DB.prepare(`
-      UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0
-    `).bind(userId).run();
+    await db
+      .update(schema.notifications)
+      .set({ isRead: 1 })
+      .where(and(eq(schema.notifications.userId, userId), eq(schema.notifications.isRead, 0)));
 
     return c.json({ success: true });
   } catch (err) {
