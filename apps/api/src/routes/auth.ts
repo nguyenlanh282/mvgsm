@@ -1,29 +1,40 @@
-import { Hono } from 'hono';
-import { hashPassword, validatePasswordPolicy } from '../utils/jwt';
-import { generateAccessToken, generateRefreshToken, verifyToken } from '../utils/jwt';
-import { writeAuditLog } from '../utils/audit';
-import type { Env } from '../types';
-import type { User } from '@mvgsm/shared';
+import { Hono } from 'hono'
+import bcrypt from 'bcryptjs'
+import { db, schema } from '../db'
+import { eq } from 'drizzle-orm'
+import { generateAccessToken, generateRefreshToken, verifyToken } from '../utils/jwt'
+import { writeAuditLog } from '../utils/audit'
 
-export const authRoutes = new Hono<{ Bindings: Env }>();
+export const authRoutes = new Hono()
+
+// Helper to get user context from token
+async function getAuthPayload(c: any) {
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) return null
+  const token = authHeader.slice(7)
+  try {
+    return await verifyToken(token)
+  } catch {
+    return null
+  }
+}
 
 // Login
 authRoutes.post('/login', async (c) => {
   try {
-    const { email, password } = await c.req.json();
+    const { email, password } = await c.req.json()
 
     if (!email || !password) {
-      return c.json({ success: false, error: 'Email và mật khẩu là bắt buộc' }, 400);
+      return c.json({ success: false, error: 'Email và mật khẩu là bắt buộc' }, 400)
     }
 
     // Find user by email
-    const userResult = await c.env.DB.prepare(
-      'SELECT * FROM users WHERE email = ? AND is_active = 1'
-    ).bind(email).first<User>();
+    const userResult = await db.query.users.findFirst({
+      where: eq(schema.users.email, email),
+    })
 
-    if (!userResult) {
-      // Log failed login attempt
-      await writeAuditLog(c.env, {
+    if (!userResult || userResult.isActive === 0) {
+      await writeAuditLog({
         companyId: 'unknown',
         entityType: 'security',
         entityId: email,
@@ -31,53 +42,57 @@ authRoutes.post('/login', async (c) => {
         userId: 'unknown',
         userName: email,
         isCritical: true,
-      });
-      return c.json({ success: false, error: 'Email hoặc mật khẩu không đúng' }, 401);
+      })
+      return c.json({ success: false, error: 'Email hoặc mật khẩu không đúng' }, 401)
     }
 
-    // Verify password using bcrypt comparison
-    // In production, use bcrypt.compare - for now using hash comparison as placeholder
-    const passwordValid = await verifyPasswordHash(password, userResult.password_hash);
+    // Verify password using bcrypt
+    const passwordValid = await bcrypt.compare(password, userResult.passwordHash)
     if (!passwordValid) {
-      await writeAuditLog(c.env, {
-        companyId: userResult.company_id,
+      await writeAuditLog({
+        companyId: userResult.companyId || 'unknown',
         entityType: 'security',
         entityId: userResult.id,
         action: 'login_failed',
         userId: userResult.id,
         userName: userResult.name,
         isCritical: true,
-      });
-      return c.json({ success: false, error: 'Email hoặc mật khẩu không đúng' }, 401);
+      })
+      return c.json({ success: false, error: 'Email hoặc mật khẩu không đúng' }, 401)
     }
 
     // Get device ID from header or generate
-    const deviceId = c.req.header('X-Device-ID') || crypto.randomUUID();
+    const deviceId = c.req.header('X-Device-ID') || crypto.randomUUID()
 
     // Generate tokens
-    const accessToken = await generateAccessToken(c.env, {
+    const accessToken = await generateAccessToken({
       userId: userResult.id,
-      companyId: userResult.company_id,
-      role: userResult.role as 'admin' | 'manager' | 'staff' | 'finance',
+      companyId: userResult.companyId || '',
+      role: userResult.role,
       deviceId,
-    });
+    })
 
-    const refreshToken = await generateRefreshToken(c.env, userResult.id, deviceId);
+    const refreshToken = await generateRefreshToken(userResult.id, deviceId)
 
-    // Store refresh token in KV - key: rt:{userId}:{deviceId}
-    const rtKey = `rt:${userResult.id}:${deviceId}`;
-    await c.env.CACHE.put(rtKey, refreshToken, { expirationTtl: 2592000 }); // 30 days
+    // Store refresh token in database
+    const refreshExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+    await db.insert(schema.refreshTokens).values({
+      userId: userResult.id,
+      tokenHash: refreshToken,
+      deviceId,
+      expiresAt: refreshExpires,
+    })
 
     // Log successful login
-    await writeAuditLog(c.env, {
-      companyId: userResult.company_id,
+    await writeAuditLog({
+      companyId: userResult.companyId || 'unknown',
       entityType: 'security',
       entityId: userResult.id,
       action: 'login_success',
       userId: userResult.id,
       userName: userResult.name,
       isCritical: true,
-    });
+    })
 
     return c.json({
       success: true,
@@ -89,141 +104,143 @@ authRoutes.post('/login', async (c) => {
           email: userResult.email,
           name: userResult.name,
           role: userResult.role,
-          companyId: userResult.company_id,
+          companyId: userResult.companyId,
         },
       },
-    });
+    })
   } catch (err) {
-    console.error('Login error:', err);
-    return c.json({ success: false, error: 'Lỗi server' }, 500);
+    console.error('Login error:', err)
+    return c.json({ success: false, error: 'Lỗi server' }, 500)
   }
-});
+})
 
 // Refresh token
 authRoutes.post('/refresh', async (c) => {
   try {
-    const { refreshToken } = await c.req.json();
+    const { refreshToken } = await c.req.json()
 
     if (!refreshToken) {
-      return c.json({ success: false, error: 'Refresh token là bắt buộc' }, 400);
+      return c.json({ success: false, error: 'Refresh token là bắt buộc' }, 400)
     }
 
-    // Verify refresh token
-    const payload = await verifyToken(refreshToken, c.env.JWT_SECRET || 'default-secret');
-    if (!payload) {
-      return c.json({ success: false, error: 'Refresh token không hợp lệ' }, 401);
-    }
+    // Find refresh token in database
+    const storedToken = await db.query.refreshTokens.findFirst({
+      where: eq(schema.refreshTokens.tokenHash, refreshToken),
+    })
 
-    // Check if refresh token exists in KV
-    const rtKey = `rt:${payload.userId}:${payload.deviceId}`;
-    const storedToken = await c.env.CACHE.get(rtKey);
-
-    if (storedToken !== refreshToken) {
-      return c.json({ success: false, error: 'Refresh token đã bị thu hồi' }, 401);
+    if (!storedToken || storedToken.expiresAt < new Date()) {
+      return c.json({ success: false, error: 'Refresh token không hợp lệ hoặc đã hết hạn' }, 401)
     }
 
     // Get user info
-    const userResult = await c.env.DB.prepare(
-      'SELECT * FROM users WHERE id = ? AND is_active = 1'
-    ).bind(payload.userId).first<User>();
+    const userResult = await db.query.users.findFirst({
+      where: eq(schema.users.id, storedToken.userId),
+    })
 
-    if (!userResult) {
-      return c.json({ success: false, error: 'Người dùng không tồn tại' }, 401);
+    if (!userResult || userResult.isActive === 0) {
+      return c.json({ success: false, error: 'Người dùng không tồn tại' }, 401)
     }
 
     // Generate new access token
-    const accessToken = await generateAccessToken(c.env, {
+    const accessToken = await generateAccessToken({
       userId: userResult.id,
-      companyId: userResult.company_id,
-      role: userResult.role as 'admin' | 'manager' | 'staff' | 'finance',
-      deviceId: payload.deviceId,
-    });
+      companyId: userResult.companyId || '',
+      role: userResult.role,
+      deviceId: storedToken.deviceId || '',
+    })
 
     return c.json({
       success: true,
       data: {
         accessToken,
       },
-    });
+    })
   } catch (err) {
-    console.error('Refresh error:', err);
-    return c.json({ success: false, error: 'Lỗi server' }, 500);
+    console.error('Refresh error:', err)
+    return c.json({ success: false, error: 'Lỗi server' }, 500)
   }
-});
+})
 
 // Logout
 authRoutes.post('/logout', async (c) => {
   try {
-    const { userId, deviceId } = await c.req.json().catch(() => ({}));
+    const { refreshToken } = await c.req.json().catch(() => ({}))
 
-    if (userId && deviceId) {
-      const rtKey = `rt:${userId}:${deviceId}`;
-      await c.env.CACHE.delete(rtKey);
+    if (refreshToken) {
+      // Delete refresh token from database
+      await db.delete(schema.refreshTokens)
+        .where(eq(schema.refreshTokens.tokenHash, refreshToken))
     }
 
-    return c.json({ success: true });
+    return c.json({ success: true })
   } catch (err) {
-    console.error('Logout error:', err);
-    return c.json({ success: false, error: 'Lỗi server' }, 500);
+    console.error('Logout error:', err)
+    return c.json({ success: false, error: 'Lỗi server' }, 500)
   }
-});
+})
 
-// Register (admin only in production, open for demo)
+// Register
 authRoutes.post('/register', async (c) => {
   try {
-    const { email, password, name, companyName } = await c.req.json();
+    const { email, password, name, companyName } = await c.req.json()
 
     if (!email || !password || !name) {
-      return c.json({ success: false, error: 'Email, mật khẩu và tên là bắt buộc' }, 400);
+      return c.json({ success: false, error: 'Email, mật khẩu và tên là bắt buộc' }, 400)
     }
 
-    // Validate password policy [C33]
-    const passwordCheck = validatePasswordPolicy(password);
-    if (!passwordCheck.valid) {
-      return c.json({ success: false, error: passwordCheck.error }, 400);
+    // Validate password policy (min 8 chars)
+    if (password.length < 8) {
+      return c.json({ success: false, error: 'Mật khẩu phải có ít nhất 8 ký tự' }, 400)
     }
 
     // Check if email already exists
-    const existing = await c.env.DB.prepare(
-      'SELECT id FROM users WHERE email = ?'
-    ).bind(email).first();
+    const existing = await db.query.users.findFirst({
+      where: eq(schema.users.email, email),
+    })
 
     if (existing) {
-      return c.json({ success: false, error: 'Email đã được sử dụng' }, 409);
+      return c.json({ success: false, error: 'Email đã được sử dụng' }, 409)
     }
 
     // Create company first
-    const companyId = crypto.randomUUID();
-    const now = Date.now();
+    const now = new Date()
+    const [company] = await db.insert(schema.companies).values({
+      name: companyName || 'My Company',
+      createdAt: now,
+      updatedAt: now,
+    }).returning()
 
-    await c.env.DB.prepare(`
-      INSERT INTO companies (id, name, created_at, updated_at)
-      VALUES (?, ?, ?, ?)
-    `).bind(companyId, companyName || 'My Company', now, now).run();
-
-    // Hash password
-    const passwordHash = await hashPassword(password);
+    // Hash password with bcrypt
+    const passwordHash = await bcrypt.hash(password, 10)
 
     // Create user (as admin)
-    const userId = crypto.randomUUID();
-    await c.env.DB.prepare(`
-      INSERT INTO users (id, company_id, email, password_hash, name, role, created_at)
-      VALUES (?, ?, ?, ?, ?, 'admin', ?)
-    `).bind(userId, companyId, email, passwordHash, name, now).run();
+    const [user] = await db.insert(schema.users).values({
+      companyId: company.id,
+      email,
+      passwordHash,
+      name,
+      role: 'admin',
+      createdAt: now,
+    }).returning()
 
     // Generate tokens
-    const deviceId = crypto.randomUUID();
-    const accessToken = await generateAccessToken(c.env, {
-      userId,
-      companyId,
+    const deviceId = crypto.randomUUID()
+    const accessToken = await generateAccessToken({
+      userId: user.id,
+      companyId: company.id,
       role: 'admin',
       deviceId,
-    });
-    const refreshToken = await generateRefreshToken(c.env, userId, deviceId);
+    })
+    const refreshToken = await generateRefreshToken(user.id, deviceId)
 
     // Store refresh token
-    const rtKey = `rt:${userId}:${deviceId}`;
-    await c.env.CACHE.put(rtKey, refreshToken, { expirationTtl: 2592000 });
+    const refreshExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    await db.insert(schema.refreshTokens).values({
+      userId: user.id,
+      tokenHash: refreshToken,
+      deviceId,
+      expiresAt: refreshExpires,
+    })
 
     return c.json({
       success: true,
@@ -231,26 +248,16 @@ authRoutes.post('/register', async (c) => {
         accessToken,
         refreshToken,
         user: {
-          id: userId,
+          id: user.id,
           email,
           name,
           role: 'admin',
-          companyId,
+          companyId: company.id,
         },
       },
-    }, 201);
+    }, 201)
   } catch (err) {
-    console.error('Register error:', err);
-    return c.json({ success: false, error: 'Lỗi server' }, 500);
+    console.error('Register error:', err)
+    return c.json({ success: false, error: 'Lỗi server' }, 500)
   }
-});
-
-// Password hash verification using SHA-256 (matching registration)
-async function verifyPasswordHash(password: string, hash: string): Promise<boolean> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashedPassword = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashedPassword === hash;
-}
+})

@@ -1,0 +1,18 @@
+{
+  "name": "@mvgsm/db",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./schema.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./schema": "./schema.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0"
+  }
+}

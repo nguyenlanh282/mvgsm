@@ -2,20 +2,25 @@
   "name": "goal-manager-api",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "db:init": "wrangler d1 migrations apply goal-manager-db --local",
-    "db:init:remote": "wrangler d1 migrations apply goal-manager-db --remote"
+    "dev": "node --watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@cloudflare/workers-types": "^4.20241127.0",
+    "@mvgsm/db": "file:../../packages/db",
     "hono": "^4.6.0",
     "bcryptjs": "^2.4.3",
     "jose": "^5.9.0"
   },
   "devDependencies": {
-    "wrangler": "^3.87.0",
-    "@types/bcryptjs": "^2.4.6"
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.0.0",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^5.0.0"
   }
 }

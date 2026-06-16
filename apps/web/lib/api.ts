@@ -1,5 +1,5 @@
-// Use Workers API directly - no fallback to /api
-const API_BASE = 'https://goal-manager-api.admin-tripower-account.workers.dev'
+// Use environment variable or default to local API
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 interface ApiOptions {
   method?: string
