@@ -4,7 +4,7 @@ import { getUser } from '../utils/roles';
 import { requireAdminOrManager, requireNotFinance } from '../utils/roles';
 import { writeAuditLog } from '../utils/audit';
 import { calculateGoalProgress, getCurrentWeek, getCurrentYear } from '../utils/progress';
-import type { Env } from '../types';
+
 
 export const trackingRoutes = new Hono<AuthContext>();
 
@@ -14,6 +14,7 @@ trackingRoutes.get('/goals/:id', async (c) => {
     const { companyId, role } = getUser(c);
     const goalId = c.req.param('id');
     const { year } = c.req.query();
+    const env = {};
 
     if (role === 'finance') {
       return c.json({ success: false, error: 'Finance không có quyền truy cập' }, 403);
@@ -22,7 +23,7 @@ trackingRoutes.get('/goals/:id', async (c) => {
     const currentYear = year ? parseInt(year) : getCurrentYear();
 
     // Get goal info
-    const goal = await c.env.DB.prepare(
+    const goal = await env.DB.prepare(
       'SELECT * FROM goals WHERE id = ? AND company_id = ?'
     ).bind(goalId, companyId).first();
 
@@ -31,7 +32,7 @@ trackingRoutes.get('/goals/:id', async (c) => {
     }
 
     // Get tracking data
-    const tracking = await c.env.DB.prepare(`
+    const tracking = await env.DB.prepare(`
       SELECT t.*, u.name as updater_name
       FROM weekly_tracking t
       LEFT JOIN users u ON t.updated_by = u.id
@@ -71,9 +72,10 @@ trackingRoutes.put('/goals/:id/week/:week', requireAdminOrManager(), requireNotF
     const goalId = c.req.param('id');
     const week = parseInt(c.req.param('week'));
     const { year, status, note } = await c.req.json();
+    const env = {};
 
     // Verify goal belongs to company
-    const goal = await c.env.DB.prepare(
+    const goal = await env.DB.prepare(
       'SELECT * FROM goals WHERE id = ? AND company_id = ?'
     ).bind(goalId, companyId).first();
 
@@ -92,7 +94,7 @@ trackingRoutes.put('/goals/:id/week/:week', requireAdminOrManager(), requireNotF
     }
 
     // Get existing tracking
-    const existing = await c.env.DB.prepare(`
+    const existing = await env.DB.prepare(`
       SELECT * FROM weekly_tracking WHERE goal_id = ? AND week_number = ? AND year = ?
     `).bind(goalId, week, year).first();
 
@@ -101,33 +103,33 @@ trackingRoutes.put('/goals/:id/week/:week', requireAdminOrManager(), requireNotF
 
     if (existing) {
       // Update existing
-      await c.env.DB.prepare(`
+      await env.DB.prepare(`
         UPDATE weekly_tracking SET status = ?, note = ?, updated_by = ?, updated_at = ?
         WHERE goal_id = ? AND week_number = ? AND year = ?
       `).bind(status, note || null, userId, now, goalId, week, year).run();
     } else {
       // Insert new
       const trackingId = crypto.randomUUID();
-      await c.env.DB.prepare(`
+      await env.DB.prepare(`
         INSERT INTO weekly_tracking (id, goal_id, week_number, year, status, note, updated_by, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(trackingId, goalId, week, year, status, note || null, userId, now).run();
     }
 
     // Write audit log to KV [C2][C4]
-    await writeAuditLog(c.env, {
+    await writeAuditLog({
       companyId,
       entityType: 'tracking',
       entityId: `${goalId}:${week}:${year}`,
       action: 'tracking_updated',
       userId,
       userName: userId,
-      oldValue: oldStatus ? { status: oldStatus } : null,
+      oldValue: oldStatus ? { status: oldStatus } : undefined,
       newValue: { status, note, week, year },
     });
 
     // Add to activity feed
-    await c.env.DB.prepare(`
+    await env.DB.prepare(`
       INSERT INTO activity_feed (id, company_id, actor_id, actor_name, action, entity_type, entity_id, entity_title, meta, created_at)
       VALUES (?, ?, ?, ?, 'tracking_updated', 'goal', ?, ?, ?, ?)
     `).bind(
@@ -147,6 +149,7 @@ trackingRoutes.get('/dashboard', async (c) => {
   try {
     const { companyId, role } = getUser(c);
     const { year, quarter } = c.req.query();
+    const env = {};
 
     const currentYear = year ? parseInt(year) : getCurrentYear();
 
@@ -168,7 +171,7 @@ trackingRoutes.get('/dashboard', async (c) => {
       params.push(parseInt(quarter));
     }
 
-    const goals = await c.env.DB.prepare(goalsQuery).bind(...params).all();
+    const goals = await env.DB.prepare(goalsQuery).bind(...params).all();
 
     // Get tracking for all goals
     const goalIds = goals.results.map((g: any) => g.id);
@@ -176,7 +179,7 @@ trackingRoutes.get('/dashboard', async (c) => {
 
     if (goalIds.length > 0) {
       const placeholders = goalIds.map(() => '?').join(',');
-      const trackingData = await c.env.DB.prepare(`
+      const trackingData = await env.DB.prepare(`
         SELECT * FROM weekly_tracking
         WHERE goal_id IN (${placeholders}) AND year = ?
       `).bind(...goalIds, currentYear).all();

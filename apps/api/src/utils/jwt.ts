@@ -1,4 +1,5 @@
 import { sign, verify } from 'hono/jwt'
+import bcrypt from 'bcryptjs'
 
 const ALGORITHM = 'HS256'
 
@@ -7,21 +8,28 @@ interface TokenPayload {
   companyId: string
   role: 'admin' | 'manager' | 'staff' | 'finance'
   deviceId: string
+  iat?: number
+  exp?: number
 }
 
 interface RefreshPayload {
   userId: string
   deviceId: string
   type: 'refresh'
+  iat: number
+  exp: number
 }
 
 export async function generateAccessToken(payload: TokenPayload): Promise<string> {
-  const expiresIn = parseInt(process.env.JWT_EXPIRES_IN || '28800', 10) // 8 hours default
+  const expiresIn = parseInt(process.env.JWT_EXPIRES_IN || '28800', 10)
   const now = Math.floor(Date.now() / 1000)
   const secret = process.env.JWT_SECRET || 'default-secret'
 
   const tokenPayload = {
-    ...payload,
+    userId: payload.userId,
+    companyId: payload.companyId,
+    role: payload.role,
+    deviceId: payload.deviceId,
     iat: now,
     exp: now + expiresIn,
   }
@@ -33,7 +41,7 @@ export async function generateRefreshToken(
   userId: string,
   deviceId: string
 ): Promise<string> {
-  const expiresIn = parseInt(process.env.REFRESH_EXPIRES_IN || '2592000', 10) // 30 days
+  const expiresIn = parseInt(process.env.REFRESH_EXPIRES_IN || '2592000', 10)
   const now = Math.floor(Date.now() / 1000)
   const secret = process.env.JWT_SECRET || 'default-secret'
 
@@ -45,17 +53,26 @@ export async function generateRefreshToken(
     exp: now + expiresIn,
   }
 
-  return await sign(payload, secret, ALGORITHM)
+  return await sign(payload as unknown as TokenPayload, secret, ALGORITHM)
 }
 
 export async function verifyToken(token: string): Promise<TokenPayload | null> {
   try {
     const secret = process.env.JWT_SECRET || 'default-secret'
-    const payload = await verify(token, secret, ALGORITHM)
-    return payload as unknown as TokenPayload
+    const payload = await verify(token, secret, ALGORITHM) as any
+    return {
+      userId: payload.userId,
+      companyId: payload.companyId,
+      role: payload.role,
+      deviceId: payload.deviceId,
+    }
   } catch {
     return null
   }
+}
+
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10)
 }
 
 export function validatePasswordPolicy(password: string): { valid: boolean; error?: string } {

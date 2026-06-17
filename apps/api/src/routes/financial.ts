@@ -12,7 +12,7 @@ export const financialRoutes = new Hono<AuthContext>();
 financialRoutes.get('/targets/:year', async (c) => {
   try {
     const companyId = c.get('companyId');
-    const year = parseInt(c.req.param('year'));
+    const year = parseInt(c.req.param('year') as string);
 
     const target = await db.query.financialTargets.findFirst({
       where: and(eq(schema.financialTargets.companyId, companyId), eq(schema.financialTargets.year, year))
@@ -26,11 +26,11 @@ financialRoutes.get('/targets/:year', async (c) => {
 });
 
 // Update financial targets
-financialRoutes.put('/targets/:year', requireAdminOrManager(), async (c) => {
+financialRoutes.put('/targets/:year', requireAdminOrManager, async (c) => {
   try {
     const companyId = c.get('companyId');
     const userId = c.get('userId');
-    const year = parseInt(c.req.param('year'));
+    const year = parseInt(c.req.param('year') as string);
     const data = await c.req.json();
 
     const existing = await db.query.financialTargets.findFirst({
@@ -72,7 +72,7 @@ financialRoutes.put('/targets/:year', requireAdminOrManager(), async (c) => {
 financialRoutes.get('/actuals/:year', async (c) => {
   try {
     const companyId = c.get('companyId');
-    const year = parseInt(c.req.param('year'));
+    const year = parseInt(c.req.param('year') as string);
 
     const actuals = await db.query.monthlyActuals.findMany({
       where: and(eq(schema.monthlyActuals.companyId, companyId), eq(schema.monthlyActuals.year, year)),
@@ -99,12 +99,12 @@ financialRoutes.get('/actuals/:year', async (c) => {
 });
 
 // Update monthly actual
-financialRoutes.put('/actuals/:year/:month', requireAdminOrManager(), async (c) => {
+financialRoutes.put('/actuals/:year/:month', requireAdminOrManager, async (c) => {
   try {
     const companyId = c.get('companyId');
     const userId = c.get('userId');
-    const year = parseInt(c.req.param('year'));
-    const month = parseInt(c.req.param('month'));
+    const year = parseInt(c.req.param('year') as string);
+    const month = parseInt(c.req.param('month') as string);
     const data = await c.req.json();
 
     if (month < 1 || month > 12) {
@@ -182,7 +182,7 @@ financialRoutes.put('/actuals/:year/:month', requireAdminOrManager(), async (c) 
 financialRoutes.get('/fiveway/:year', async (c) => {
   try {
     const companyId = c.get('companyId');
-    const year = parseInt(c.req.param('year'));
+    const year = parseInt(c.req.param('year') as string);
     const { quarter } = c.req.query();
 
     // Get monthly actuals

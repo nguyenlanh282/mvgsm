@@ -1,10 +1,10 @@
 import type { AuthContext } from '../index';
 import { Hono } from 'hono';
-import { getUser } from '../utils/roles';
+import { db, schema } from '../db';
+import { eq, and, isNull, desc, ne } from 'drizzle-orm';
 import { requireAdmin, requireAdminOrManager, requireNotFinance } from '../utils/roles';
 import { writeAuditLog } from '../utils/audit';
 import { getQuarterWeeks, has53Weeks } from '../utils/progress';
-import type { Env } from '../types';
 import type { Goal, GoalCategory } from '@mvgsm/shared';
 
 export const goalRoutes = new Hono<AuthContext>();
@@ -12,7 +12,8 @@ export const goalRoutes = new Hono<AuthContext>();
 // Get goals with filters
 goalRoutes.get('/', async (c) => {
   try {
-    const { companyId, role } = getUser(c);
+    const companyId = c.get('companyId');
+    const role = c.get('role');
     const { year, category, dept, status, include_deleted } = c.req.query();
 
     // Finance role cannot access goals [C4]
@@ -20,42 +21,33 @@ goalRoutes.get('/', async (c) => {
       return c.json({ success: false, error: 'Finance không có quyền truy cập mục tiêu' }, 403);
     }
 
-    let query = `
-      SELECT g.*, d.name as department_name, u.name as creator_name
-      FROM goals g
-      LEFT JOIN departments d ON g.owner_dept_id = d.id
-      LEFT JOIN users u ON g.created_by = u.id
-      WHERE g.company_id = ?
-    `;
-    const params: (string | number)[] = [companyId];
+    const conditions = [eq(schema.goals.companyId, companyId)];
 
-    // Only show non-deleted by default
     if (!include_deleted) {
-      query += ' AND g.deleted_at IS NULL';
+      conditions.push(isNull(schema.goals.deletedAt));
     }
-
     if (year) {
-      query += ' AND g.year = ?';
-      params.push(parseInt(year));
+      conditions.push(eq(schema.goals.year, parseInt(year)));
     }
     if (category) {
-      query += ' AND g.category = ?';
-      params.push(category);
+      conditions.push(eq(schema.goals.category, category as GoalCategory));
     }
     if (dept) {
-      query += ' AND g.owner_dept_id = ?';
-      params.push(dept);
+      conditions.push(eq(schema.goals.ownerDeptId, dept));
     }
     if (status) {
-      query += ' AND g.status = ?';
-      params.push(status);
+      conditions.push(eq(schema.goals.status, status as Goal['status']));
     }
 
-    query += ' ORDER BY g.created_at DESC';
+    const goals = await db.query.goals.findMany({
+      where: and(...conditions),
+      with: {
+        strategies: true,
+      },
+      orderBy: desc(schema.goals.createdAt),
+    });
 
-    const goals = await c.env.DB.prepare(query).bind(...params).all();
-
-    return c.json({ success: true, data: goals.results });
+    return c.json({ success: true, data: goals });
   } catch (err) {
     console.error('Get goals error:', err);
     return c.json({ success: false, error: 'Lỗi server' }, 500);
@@ -65,43 +57,31 @@ goalRoutes.get('/', async (c) => {
 // Get single goal
 goalRoutes.get('/:id', async (c) => {
   try {
-    const { companyId, role } = getUser(c);
+    const companyId = c.get('companyId');
+    const role = c.get('role');
     const goalId = c.req.param('id');
 
     if (role === 'finance') {
       return c.json({ success: false, error: 'Finance không có quyền truy cập mục tiêu' }, 403);
     }
 
-    const goal = await c.env.DB.prepare(`
-      SELECT g.*, d.name as department_name, u.name as creator_name
-      FROM goals g
-      LEFT JOIN departments d ON g.owner_dept_id = d.id
-      LEFT JOIN users u ON g.created_by = u.id
-      WHERE g.id = ? AND g.company_id = ?
-    `).bind(goalId, companyId).first();
+    const goal = await db.query.goals.findFirst({
+      where: and(eq(schema.goals.id, goalId), eq(schema.goals.companyId, companyId)),
+      with: {
+        strategies: {
+          orderBy: (strategies, { asc }) => [asc(strategies.sortOrder)],
+        },
+        rewardApprovals: {
+          orderBy: (approvals, { desc }) => [desc(approvals.requestedAt)],
+        },
+      },
+    });
 
     if (!goal) {
       return c.json({ success: false, error: 'Mục tiêu không tồn tại' }, 404);
     }
 
-    // Get strategies
-    const strategies = await c.env.DB.prepare(
-      'SELECT * FROM strategies WHERE goal_id = ? ORDER BY sort_order'
-    ).bind(goalId).all();
-
-    // Get reward approvals for this goal
-    const rewardApprovals = await c.env.DB.prepare(
-      'SELECT * FROM reward_approvals WHERE goal_id = ? ORDER BY requested_at DESC'
-    ).bind(goalId).all();
-
-    return c.json({
-      success: true,
-      data: {
-        ...goal,
-        strategies: strategies.results,
-        rewardApprovals: rewardApprovals.results,
-      },
-    });
+    return c.json({ success: true, data: goal });
   } catch (err) {
     console.error('Get goal error:', err);
     return c.json({ success: false, error: 'Lỗi server' }, 500);
@@ -111,7 +91,8 @@ goalRoutes.get('/:id', async (c) => {
 // Create goal
 goalRoutes.post('/', requireAdminOrManager(), requireNotFinance(), async (c) => {
   try {
-    const { companyId, userId } = getUser(c);
+    const companyId = c.get('companyId');
+    const userId = c.get('userId');
     const data = await c.req.json();
 
     // Validate required fields
@@ -148,14 +129,22 @@ goalRoutes.post('/', requireAdminOrManager(), requireNotFinance(), async (c) => 
       return c.json({ success: false, error: 'Tuần kết thúc phải lớn hơn hoặc bằng tuần bắt đầu' }, 400);
     }
 
-    // [C28] Weight validation warning
+    // [C28] Weight validation warning - get all goals for this category/year and sum weights
     const weight = data.weight || 10;
-    const existingWeights = await c.env.DB.prepare(`
-      SELECT SUM(weight) as total FROM goals
-      WHERE company_id = ? AND category = ? AND year = ? AND status = 'active' AND deleted_at IS NULL
-    `).bind(companyId, data.category, data.year).first<{ total: number | null }>();
+    const existingGoals = await db.query.goals.findMany({
+      where: and(
+        eq(schema.goals.companyId, companyId),
+        eq(schema.goals.category, data.category),
+        eq(schema.goals.year, data.year),
+        eq(schema.goals.status, 'active'),
+        isNull(schema.goals.deletedAt)
+      ),
+      columns: {
+        weight: true,
+      },
+    });
 
-    const currentTotal = existingWeights?.total || 0;
+    const currentTotal = existingGoals.reduce((sum, g) => sum + (g.weight || 0), 0);
     const newTotal = currentTotal + weight;
     let weightWarning: string | null = null;
 
@@ -166,38 +155,49 @@ goalRoutes.post('/', requireAdminOrManager(), requireNotFinance(), async (c) => 
     }
 
     const goalId = crypto.randomUUID();
-    const now = Date.now();
+    const now = new Date();
 
-    await c.env.DB.prepare(`
-      INSERT INTO goals (
-        id, company_id, category, year, quarter, start_week, end_week,
-        title, description, measure, target_value, current_value, unit,
-        deadline, weight, owner_dept_id, collab_dept_ids, reward, reward_value,
-        status, created_by, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      goalId, companyId, data.category, data.year, data.quarter || null,
-      startWeek, endWeek, data.title, data.description || null,
-      data.measure || null, data.target_value || null, data.current_value || null,
-      data.unit || null, data.deadline || null, weight,
-      data.owner_dept_id || null, JSON.stringify(data.collab_dept_ids || []),
-      data.reward || null, data.reward_value || null,
-      data.status || 'draft', userId, now, now
-    ).run();
+    await db.insert(schema.goals).values({
+      id: goalId,
+      companyId,
+      category: data.category,
+      year: data.year,
+      quarter: data.quarter || null,
+      startWeek,
+      endWeek,
+      title: data.title,
+      description: data.description || null,
+      measure: data.measure || null,
+      targetValue: data.target_value || null,
+      currentValue: data.current_value || null,
+      unit: data.unit || null,
+      deadline: data.deadline || null,
+      weight,
+      ownerDeptId: data.owner_dept_id || null,
+      collabDeptIds: data.collab_dept_ids || [],
+      reward: data.reward || null,
+      rewardValue: data.reward_value || null,
+      status: data.status || 'draft',
+      createdBy: userId,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     // Add strategies if provided
     if (data.strategies && Array.isArray(data.strategies)) {
       for (let i = 0; i < data.strategies.length; i++) {
         const strategy = data.strategies[i];
-        const strategyId = crypto.randomUUID();
-        await c.env.DB.prepare(`
-          INSERT INTO strategies (id, goal_id, title, description, sort_order)
-          VALUES (?, ?, ?, ?, ?)
-        `).bind(strategyId, goalId, strategy.title, strategy.description || null, i).run();
+        await db.insert(schema.strategies).values({
+          id: crypto.randomUUID(),
+          goalId,
+          title: strategy.title,
+          description: strategy.description || null,
+          sortOrder: i,
+        });
       }
     }
 
-    await writeAuditLog(c.env, {
+    await writeAuditLog({
       companyId,
       entityType: 'goal',
       entityId: goalId,
@@ -207,7 +207,9 @@ goalRoutes.post('/', requireAdminOrManager(), requireNotFinance(), async (c) => 
       newValue: { title: data.title, category: data.category },
     });
 
-    const goal = await c.env.DB.prepare('SELECT * FROM goals WHERE id = ?').bind(goalId).first();
+    const goal = await db.query.goals.findFirst({
+      where: eq(schema.goals.id, goalId),
+    });
 
     return c.json({ success: true, data: goal, weightWarning }, 201);
   } catch (err) {
@@ -219,13 +221,14 @@ goalRoutes.post('/', requireAdminOrManager(), requireNotFinance(), async (c) => 
 // Update goal
 goalRoutes.put('/:id', requireAdminOrManager(), requireNotFinance(), async (c) => {
   try {
-    const { companyId, userId } = getUser(c);
+    const companyId = c.get('companyId');
+    const userId = c.get('userId');
     const goalId = c.req.param('id');
     const data = await c.req.json();
 
-    const existing = await c.env.DB.prepare(
-      'SELECT * FROM goals WHERE id = ? AND company_id = ?'
-    ).bind(goalId, companyId).first<Goal>();
+    const existing = await db.query.goals.findFirst({
+      where: and(eq(schema.goals.id, goalId), eq(schema.goals.companyId, companyId)),
+    });
 
     if (!existing) {
       return c.json({ success: false, error: 'Mục tiêu không tồn tại' }, 404);
@@ -236,12 +239,22 @@ goalRoutes.put('/:id', requireAdminOrManager(), requireNotFinance(), async (c) =
     if (data.weight !== undefined) {
       const category = data.category || existing.category;
       const year = data.year || existing.year;
-      const existingWeights = await c.env.DB.prepare(`
-        SELECT SUM(weight) as total FROM goals
-        WHERE company_id = ? AND category = ? AND year = ? AND status = 'active' AND deleted_at IS NULL AND id != ?
-      `).bind(companyId, category, year, goalId).first<{ total: number | null }>();
 
-      const currentTotal = existingWeights?.total || 0;
+      const existingGoals = await db.query.goals.findMany({
+        where: and(
+          eq(schema.goals.companyId, companyId),
+          eq(schema.goals.category, category),
+          eq(schema.goals.year, year),
+          eq(schema.goals.status, 'active'),
+          isNull(schema.goals.deletedAt),
+          ne(schema.goals.id, goalId)
+        ),
+        columns: {
+          weight: true,
+        },
+      });
+
+      const currentTotal = existingGoals.reduce((sum, g) => sum + (g.weight || 0), 0);
       const newTotal = currentTotal + data.weight;
       if (newTotal > 100) {
         weightWarning = `⚠️ Trọng số trụ cột sẽ là ${newTotal}% (vượt quá 100%). Khuyến nghị điều chỉnh.`;
@@ -250,52 +263,68 @@ goalRoutes.put('/:id', requireAdminOrManager(), requireNotFinance(), async (c) =
       }
     }
 
-    const fields: string[] = [];
-    const values: (string | number | null)[] = [];
-
     // Build update fields
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+
     const allowedFields = [
       'title', 'description', 'category', 'year', 'quarter', 'start_week', 'end_week',
       'measure', 'target_value', 'current_value', 'unit', 'deadline', 'weight',
       'owner_dept_id', 'collab_dept_ids', 'reward', 'reward_value', 'status'
     ];
 
+    const fieldMapping: Record<string, keyof typeof schema.goals.$inferInsert> = {
+      title: 'title',
+      description: 'description',
+      category: 'category',
+      year: 'year',
+      quarter: 'quarter',
+      start_week: 'startWeek',
+      end_week: 'endWeek',
+      measure: 'measure',
+      target_value: 'targetValue',
+      current_value: 'currentValue',
+      unit: 'unit',
+      deadline: 'deadline',
+      weight: 'weight',
+      owner_dept_id: 'ownerDeptId',
+      collab_dept_ids: 'collabDeptIds',
+      reward: 'reward',
+      reward_value: 'rewardValue',
+      status: 'status',
+    };
+
     for (const field of allowedFields) {
       if (data[field] !== undefined) {
-        fields.push(`${field} = ?`);
-        if (field === 'collab_dept_ids') {
-          values.push(JSON.stringify(data[field]));
+        const dbField = fieldMapping[field];
+        if (dbField === 'collabDeptIds') {
+          updateData[dbField] = JSON.stringify(data[field]);
         } else {
-          values.push(data[field] as string | number | null);
+          updateData[dbField] = data[field];
         }
       }
     }
 
-    fields.push('updated_at = ?');
-    values.push(Date.now());
-    values.push(goalId);
-
-    await c.env.DB.prepare(`
-      UPDATE goals SET ${fields.join(', ')} WHERE id = ?
-    `).bind(...values).run();
+    await db.update(schema.goals).set(updateData as any).where(eq(schema.goals.id, goalId));
 
     // Update strategies if provided
     if (data.strategies !== undefined && Array.isArray(data.strategies)) {
       // Delete existing strategies
-      await c.env.DB.prepare('DELETE FROM strategies WHERE goal_id = ?').bind(goalId).run();
+      await db.delete(schema.strategies).where(eq(schema.strategies.goalId, goalId));
 
       // Insert new strategies
       for (let i = 0; i < data.strategies.length; i++) {
         const strategy = data.strategies[i];
-        const strategyId = crypto.randomUUID();
-        await c.env.DB.prepare(`
-          INSERT INTO strategies (id, goal_id, title, description, sort_order)
-          VALUES (?, ?, ?, ?, ?)
-        `).bind(strategyId, goalId, strategy.title, strategy.description || null, i).run();
+        await db.insert(schema.strategies).values({
+          id: crypto.randomUUID(),
+          goalId,
+          title: strategy.title,
+          description: strategy.description || null,
+          sortOrder: i,
+        });
       }
     }
 
-    await writeAuditLog(c.env, {
+    await writeAuditLog({
       companyId,
       entityType: 'goal',
       entityId: goalId,
@@ -306,7 +335,9 @@ goalRoutes.put('/:id', requireAdminOrManager(), requireNotFinance(), async (c) =
       newValue: data,
     });
 
-    const updated = await c.env.DB.prepare('SELECT * FROM goals WHERE id = ?').bind(goalId).first();
+    const updated = await db.query.goals.findFirst({
+      where: eq(schema.goals.id, goalId),
+    });
 
     return c.json({ success: true, data: updated, weightWarning });
   } catch (err) {
@@ -318,22 +349,23 @@ goalRoutes.put('/:id', requireAdminOrManager(), requireNotFinance(), async (c) =
 // Soft delete goal [C29]
 goalRoutes.delete('/:id', requireAdminOrManager(), requireNotFinance(), async (c) => {
   try {
-    const { companyId, userId } = getUser(c);
+    const companyId = c.get('companyId');
+    const userId = c.get('userId');
     const goalId = c.req.param('id');
 
-    const existing = await c.env.DB.prepare(
-      'SELECT * FROM goals WHERE id = ? AND company_id = ?'
-    ).bind(goalId, companyId).first();
+    const existing = await db.query.goals.findFirst({
+      where: and(eq(schema.goals.id, goalId), eq(schema.goals.companyId, companyId)),
+    });
 
     if (!existing) {
       return c.json({ success: false, error: 'Mục tiêu không tồn tại' }, 404);
     }
 
-    await c.env.DB.prepare(`
-      UPDATE goals SET deleted_at = ?, updated_at = ? WHERE id = ?
-    `).bind(Date.now(), Date.now(), goalId).run();
+    await db.update(schema.goals)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(schema.goals.id, goalId));
 
-    await writeAuditLog(c.env, {
+    await writeAuditLog({
       companyId,
       entityType: 'goal',
       entityId: goalId,
@@ -352,22 +384,23 @@ goalRoutes.delete('/:id', requireAdminOrManager(), requireNotFinance(), async (c
 // Restore deleted goal [C29]
 goalRoutes.post('/:id/restore', requireAdmin(), async (c) => {
   try {
-    const { companyId, userId } = getUser(c);
+    const companyId = c.get('companyId');
+    const userId = c.get('userId');
     const goalId = c.req.param('id');
 
-    const existing = await c.env.DB.prepare(
-      'SELECT * FROM goals WHERE id = ? AND company_id = ?'
-    ).bind(goalId, companyId).first();
+    const existing = await db.query.goals.findFirst({
+      where: and(eq(schema.goals.id, goalId), eq(schema.goals.companyId, companyId)),
+    });
 
     if (!existing) {
       return c.json({ success: false, error: 'Mục tiêu không tồn tại' }, 404);
     }
 
-    await c.env.DB.prepare(`
-      UPDATE goals SET deleted_at = NULL, updated_at = ? WHERE id = ?
-    `).bind(Date.now(), goalId).run();
+    await db.update(schema.goals)
+      .set({ deletedAt: null, updatedAt: new Date() })
+      .where(eq(schema.goals.id, goalId));
 
-    await writeAuditLog(c.env, {
+    await writeAuditLog({
       companyId,
       entityType: 'goal',
       entityId: goalId,
@@ -376,7 +409,9 @@ goalRoutes.post('/:id/restore', requireAdmin(), async (c) => {
       userName: userId,
     });
 
-    const restored = await c.env.DB.prepare('SELECT * FROM goals WHERE id = ?').bind(goalId).first();
+    const restored = await db.query.goals.findFirst({
+      where: eq(schema.goals.id, goalId),
+    });
 
     return c.json({ success: true, data: restored });
   } catch (err) {
@@ -388,36 +423,44 @@ goalRoutes.post('/:id/restore', requireAdmin(), async (c) => {
 // Add strategy to goal
 goalRoutes.post('/:id/strategies', requireAdminOrManager(), requireNotFinance(), async (c) => {
   try {
-    const { companyId, userId } = getUser(c);
+    const companyId = c.get('companyId');
+    const userId = c.get('userId');
     const goalId = c.req.param('id');
     const { title, description } = await c.req.json();
 
     // Verify goal belongs to company
-    const goal = await c.env.DB.prepare(
-      'SELECT id FROM goals WHERE id = ? AND company_id = ?'
-    ).bind(goalId, companyId).first();
+    const goal = await db.query.goals.findFirst({
+      where: and(eq(schema.goals.id, goalId), eq(schema.goals.companyId, companyId)),
+      columns: { id: true },
+    });
 
     if (!goal) {
       return c.json({ success: false, error: 'Mục tiêu không tồn tại' }, 404);
     }
 
-    const strategyId = crypto.randomUUID();
-
     // Get max sort_order
-    const maxOrder = await c.env.DB.prepare(
-      'SELECT MAX(sort_order) as max_order FROM strategies WHERE goal_id = ?'
-    ).bind(goalId).first<{ max_order: number | null }>();
+    const strategies = await db.query.strategies.findMany({
+      where: eq(schema.strategies.goalId, goalId),
+      columns: { sortOrder: true },
+      orderBy: (strategies, { desc }) => [desc(strategies.sortOrder)],
+      limit: 1,
+    });
 
-    const sortOrder = (maxOrder?.max_order ?? -1) + 1;
+    const maxOrder = strategies[0]?.sortOrder ?? -1;
+    const sortOrder = maxOrder + 1;
 
-    await c.env.DB.prepare(`
-      INSERT INTO strategies (id, goal_id, title, description, sort_order)
-      VALUES (?, ?, ?, ?, ?)
-    `).bind(strategyId, goalId, title, description || null, sortOrder).run();
+    const strategyId = crypto.randomUUID();
+    await db.insert(schema.strategies).values({
+      id: strategyId,
+      goalId,
+      title,
+      description: description || null,
+      sortOrder,
+    });
 
-    const strategy = await c.env.DB.prepare(
-      'SELECT * FROM strategies WHERE id = ?'
-    ).bind(strategyId).first();
+    const strategy = await db.query.strategies.findFirst({
+      where: eq(schema.strategies.id, strategyId),
+    });
 
     return c.json({ success: true, data: strategy }, 201);
   } catch (err) {

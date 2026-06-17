@@ -2,7 +2,7 @@ import type { AuthContext } from '../index';
 import { Hono } from 'hono'
 import bcrypt from 'bcryptjs'
 import { db, schema } from '../db'
-import { eq } from 'drizzle-orm'
+import { eq, or, isNull, sql } from 'drizzle-orm'
 import { generateAccessToken, generateRefreshToken, verifyToken } from '../utils/jwt'
 import { writeAuditLog } from '../utils/audit'
 
@@ -135,7 +135,7 @@ authRoutes.post('/refresh', async (c) => {
 
     // Get user info
     const userResult = await db.query.users.findFirst({
-      where: eq(schema.users.id, storedToken.userId),
+      where: sql`${schema.users.id} = ${storedToken.userId}`,
     })
 
     if (!userResult || userResult.isActive === 0) {

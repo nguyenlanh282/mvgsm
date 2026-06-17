@@ -2,7 +2,7 @@ import type { AuthContext } from '../index';
 import { Hono } from 'hono';
 import { requireAdminOrManager, requireAdmin } from '../utils/roles';
 import { db, schema } from '../db';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 export const departmentRoutes = new Hono<AuthContext>();
 
@@ -17,10 +17,10 @@ departmentRoutes.get('/', async (c) => {
     });
 
     // Get manager names
-    const managerIds = departments.map(d => d.managerId).filter(Boolean);
+    const managerIds = departments.map(d => d.managerId).filter((id): id is string => Boolean(id));
     const managers = managerIds.length > 0
       ? await db.query.users.findMany({
-          where: eq(schema.users.id, managerIds[0]),
+          where: inArray(schema.users.id, managerIds),
         })
       : [];
 

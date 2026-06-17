@@ -107,6 +107,10 @@ userRoutes.put('/:id', requireAdmin(), async (c) => {
     const updates = await c.req.json();
 
     // Check if user exists and belongs to company
+    if (!targetUserId) {
+      return c.json({ success: false, error: 'ID người dùng không hợp lệ' }, 400);
+    }
+
     const existing = await db.query.users.findFirst({
       where: eq(schema.users.id, targetUserId),
     });
