@@ -53,7 +53,7 @@ export async function generateRefreshToken(
     exp: now + expiresIn,
   }
 
-  return await sign(payload as unknown as TokenPayload, secret, ALGORITHM)
+  return await sign(payload as any, secret, ALGORITHM)
 }
 
 export async function verifyToken(token: string): Promise<TokenPayload | null> {
